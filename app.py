@@ -22,7 +22,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Session State for 4-Category Independent Watchlists & Toggles
+# Initialize Session State for Watchlists & All Toggles Robustly
 if 'nse_watchlist' not in st.session_state:
     st.session_state.nse_watchlist = ["NIFTY", "BANKNIFTY", "RELIANCE", "TATASTEEL"]
 if 'crypto_watchlist' not in st.session_state:
@@ -32,14 +32,12 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-if 'nse_toggle' not in st.session_state:
-    st.session_state.nse_toggle = True
-if 'crypto_toggle' not in st.session_state:
-    st.session_state.crypto_toggle = True
-if 'forex_toggle' not in st.session_state:
-    st.session_state.forex_toggle = True
-if 'mcx_toggle' not in st.session_state:
-    st.session_state.mcx_toggle = True
+# Initialize Toggles cleanly in session state
+if 'nse_toggle' not in st.session_state: st.session_state.nse_toggle = True
+if 'crypto_toggle' not in st.session_state: st.session_state.crypto_toggle = True
+if 'forex_toggle' not in st.session_state: st.session_state.forex_toggle = True
+if 'mcx_toggle' not in st.session_state: st.session_state.mcx_toggle = True
+if 'killzone_toggle' not in st.session_state: st.session_state.killzone_toggle = True
 
 # --- PROFESSIONAL LIVE DATA FETCHING ENGINE ---
 def get_live_price(symbol, market_type):
@@ -132,7 +130,7 @@ CONFIRMATION_FILTERS = [
     "Zero-Line Crossover", "Multi-Timeframe Sweep"
 ]
 
-# Sidebar Controls (Original 4 Options Intact)
+# Sidebar Controls
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 selected_market = st.sidebar.selectbox(
     "Select Market Category",
@@ -142,11 +140,17 @@ selected_market = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists & Toggles")
 
-# Category-wise Watchlist Managers with Inline Remove Buttons
+# Global Toggles Rendered Safely Outside Watchlist Blocks
+st.session_state.nse_toggle = st.sidebar.toggle("NSE Alerts ON/OFF", value=st.session_state.nse_toggle, key="tgl_nse")
+st.session_state.crypto_toggle = st.sidebar.toggle("Crypto Alerts ON/OFF", value=st.session_state.crypto_toggle, key="tgl_crypto")
+st.session_state.forex_toggle = st.sidebar.toggle("Forex Alerts ON/OFF", value=st.session_state.forex_toggle, key="tgl_forex")
+st.session_state.mcx_toggle = st.sidebar.toggle("MCX Alerts ON/OFF", value=st.session_state.mcx_toggle, key="tgl_mcx")
+
+st.sidebar.markdown("---")
+
+# Category-wise Watchlist Managers
 if selected_market.startswith("NSE"):
     st.sidebar.markdown("**🟢 NSE Watchlist (Dhan Powered)**")
-    st.session_state.nse_toggle = st.sidebar.toggle("NSE Alerts ON/OFF", value=st.session_state.nse_toggle, key="tgl_nse")
-    
     new_nse = st.sidebar.text_input("Add Symbol to NSE", key="input_nse_box", placeholder="e.g. RELIANCE, SBIN")
     if st.sidebar.button("Add to NSE", key="btn_nse"):
         if new_nse:
@@ -171,13 +175,10 @@ if selected_market.startswith("NSE"):
                 st.rerun()
             else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
-
     is_active_toggle = st.session_state.nse_toggle
 
 elif selected_market.startswith("Crypto"):
     st.sidebar.markdown("**🪙 Crypto Watchlist**")
-    st.session_state.crypto_toggle = st.sidebar.toggle("Crypto Alerts ON/OFF", value=st.session_state.crypto_toggle, key="tgl_crypto")
-    
     new_crypto = st.sidebar.text_input("Add Symbol to Crypto", key="input_crypto_box", placeholder="e.g. BTC or BTC-USD")
     if st.sidebar.button("Add to Crypto", key="btn_crypto"):
         if new_crypto:
@@ -202,13 +203,10 @@ elif selected_market.startswith("Crypto"):
                 st.rerun()
             else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
-
     is_active_toggle = st.session_state.crypto_toggle
 
 elif selected_market.startswith("FOREX"):
     st.sidebar.markdown("**💱 FOREX Watchlist**")
-    st.session_state.forex_toggle = st.sidebar.toggle("Forex Alerts ON/OFF", value=st.session_state.forex_toggle, key="tgl_forex")
-    
     new_forex = st.sidebar.text_input("Add Symbol to Forex", key="input_forex_box", placeholder="e.g. EURUSD")
     if st.sidebar.button("Add to Forex", key="btn_forex"):
         if new_forex:
@@ -232,13 +230,10 @@ elif selected_market.startswith("FOREX"):
                 st.rerun()
             else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
-
     is_active_toggle = st.session_state.forex_toggle
 
 else:
     st.sidebar.markdown("**🛢️ MCX Watchlist (Dhan Powered)**")
-    st.session_state.mcx_toggle = st.sidebar.toggle("MCX Alerts ON/OFF", value=st.session_state.mcx_toggle, key="tgl_mcx")
-    
     new_mcx = st.sidebar.text_input("Add Symbol to MCX", key="input_mcx_box", placeholder="e.g. CRUDEOIL, GOLD")
     if st.sidebar.button("Add to MCX", key="btn_mcx"):
         if new_mcx:
@@ -263,14 +258,13 @@ else:
                 st.rerun()
             else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
-
     is_active_toggle = st.session_state.mcx_toggle
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🕒 Session & Killzone Toggle")
-killzone_toggle = st.sidebar.toggle("Active Session / Killzone (Visual)", value=True)
+st.session_state.killzone_toggle = st.sidebar.toggle("Active Session / Killzone (Visual)", value=st.session_state.killzone_toggle, key="tgl_killzone")
 
-if killzone_toggle:
+if st.session_state.killzone_toggle:
     st.sidebar.success("🟢 Killzone Active: High Probability Array Setup")
 else:
     st.sidebar.warning("⚪ Killzone Inactive: Reference Mode Only")
@@ -291,7 +285,6 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Scanner & Engine", "📸 Manual Screensho
 with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
     
-    # Single Clean Dropdown for Market/Category Selection
     col1, col2 = st.columns(2)
     with col1:
         target_category = st.selectbox(
@@ -301,7 +294,6 @@ with tab1:
     with col2:
         scan_mode = st.selectbox("Scan Mode", ["24/7 Autonomous Stream", "Instant Deep Scan"])
 
-    # Automatically pick/scan assets based on selected category
     if target_category == "All Markets":
         all_assets = (
             st.session_state.nse_watchlist + 
@@ -310,19 +302,14 @@ with tab1:
             st.session_state.mcx_watchlist
         )
         asset_input = random.choice(all_assets) if all_assets else "NIFTY"
-        market_label = "ALL"
     elif target_category.startswith("NSE"):
         asset_input = random.choice(st.session_state.nse_watchlist) if st.session_state.nse_watchlist else "NIFTY"
-        market_label = "NSE"
     elif target_category.startswith("Crypto"):
         asset_input = random.choice(st.session_state.crypto_watchlist) if st.session_state.crypto_watchlist else "BTC-USD"
-        market_label = "Crypto"
     elif target_category.startswith("FOREX"):
         asset_input = random.choice(st.session_state.forex_watchlist) if st.session_state.forex_watchlist else "EURUSD"
-        market_label = "FOREX"
     else:
         asset_input = random.choice(st.session_state.mcx_watchlist) if st.session_state.mcx_watchlist else "CRUDEOIL"
-        market_label = "MCX"
 
     st.info(f"📋 **Scanning Category:** `{target_category}` | **Auto-Selected Asset:** `{asset_input}`")
 
@@ -367,7 +354,7 @@ with tab1:
                 <div class="alert-box">
                 <h3>🎯 STRATEGY MATCHED: {matched_strat} (Rank 1 Setup)</h3>
                 <p><b>Market Category & Asset:</b> {asset_label}</p>
-                <p><b>Active Session Status:</b> {'London Open / NY Killzone [ON]' if killzone_toggle else 'Manual Reference [OFF]'}</p>
+                <p><b>Active Session Status:</b> {'London Open / NY Killzone [ON]' if st.session_state.killzone_toggle else 'Manual Reference [OFF]'}</p>
                 <p><b>Confluences Found ({score}/13):</b> {', '.join(matched_confluences)}</p>
                 <p><b>Classification:</b> Intraday / Swing | High Probability Setup</p>
                 <hr style="border-color: #2a2e39;">
@@ -411,7 +398,7 @@ with tab2:
         if st.button("Run AI Vision Strategy Matching"):
             st.success("🎯 Strategy Identified: **ICT 2022 Model + Liquidity Sweep**. All 12+13 matrix filters validated successfully!")
 
-with tab3:
+withtab3:
     st.markdown("### 📊 Automated Performance Analytics (/stats)")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Win Rate", "68.4%", "+4.2%")
