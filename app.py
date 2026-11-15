@@ -129,17 +129,17 @@ CONFIRMATION_FILTERS = [
     "Zero-Line Crossover", "Multi-Timeframe Sweep"
 ]
 
-# Sidebar Controls
+# Sidebar Controls (Now with "All" included)
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 selected_market = st.sidebar.selectbox(
     "Select Market Category",
-    ["NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
+    ["All", "NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
 )
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🔔 Global Market Toggles")
 
-# --- MASTER TOGGLES PLACED SAFELY AT THE TOP LEVEL (UNCONDITIONAL) ---
+# Master Toggles Placed Safely at the Top Level
 st.session_state.nse_toggle = st.sidebar.toggle("🟢 NSE Alerts ON/OFF", value=st.session_state.nse_toggle, key="top_tgl_nse")
 st.session_state.crypto_toggle = st.sidebar.toggle("🪙 Crypto Alerts ON/OFF", value=st.session_state.crypto_toggle, key="top_tgl_crypto")
 st.session_state.forex_toggle = st.sidebar.toggle("💱 Forex Alerts ON/OFF", value=st.session_state.forex_toggle, key="top_tgl_forex")
@@ -148,8 +148,12 @@ st.session_state.mcx_toggle = st.sidebar.toggle("🛢️ MCX Alerts ON/OFF", val
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists")
 
-# Category-wise Watchlist Managers (Cleaned up from toggle conflicts)
-if selected_market.startswith("NSE"):
+# Category-wise Watchlist Managers
+if selected_market == "All":
+    st.sidebar.markdown("**🌐 Global Master Watchlist (All Active)**")
+    st.sidebar.info("Viewing all markets combined. Choose a specific market above to edit its watchlist.")
+
+elif selected_market.startswith("NSE"):
     st.sidebar.markdown("**🟢 NSE Watchlist (Dhan Powered)**")
     new_nse = st.sidebar.text_input("Add Symbol to NSE", key="input_nse_box", placeholder="e.g. RELIANCE, SBIN")
     if st.sidebar.button("Add to NSE", key="btn_nse"):
@@ -257,15 +261,6 @@ else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 🕒 Session & Killzone Toggle")
-st.session_state.killzone_toggle = st.sidebar.toggle("Active Session / Killzone (Visual)", value=st.session_state.killzone_toggle, key="top_tgl_killzone")
-
-if st.session_state.killzone_toggle:
-    st.sidebar.success("🟢 Killzone Active: High Probability Array Setup")
-else:
-    st.sidebar.warning("⚪ Killzone Inactive: Reference Mode Only")
-
-st.sidebar.markdown("---")
 st.sidebar.markdown("### 🧮 Risk & Position Sizing")
 capital = st.sidebar.number_input("Trading Capital (₹ / $)", value=50000, step=5000)
 risk_pct = st.sidebar.slider("Risk Per Trade (%)", 0.5, 3.0, 1.0, 0.5)
@@ -281,6 +276,15 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Scanner & Engine", "📸 Manual Screensho
 with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
     
+    # --- KILLZONE TOGGLE PLACED DIRECTLY ON MAIN SCREEN (TAB 1) ---
+    st.session_state.killzone_toggle = st.toggle("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", value=st.session_state.killzone_toggle, key="main_screen_killzone")
+    if st.session_state.killzone_toggle:
+        st.success("🟢 Killzone Active: High Probability Array Setup Enabled")
+    else:
+        st.warning("⚪ Killzone Inactive: Reference Mode Only")
+    
+    st.markdown("---")
+
     col1, col2 = st.columns(2)
     with col1:
         target_category = st.selectbox(
@@ -363,7 +367,7 @@ with tab1:
                 <ul>
                     <li><b>Live Reference Price:</b> ₹ / $ {entry_price:,.2f}</li>
                     <li><b>Stop Loss (SL):</b> ₹ / $ {sl_price:,.2f}</li>
-                    <li><b>Target 1 (T1):</b> ₹ / $ {t1:,.2f} | <b>Target 2 (T2):</b> ₹ / $ {t2:,.2f} | <b>Target 3 (T3):</b> ₹ / $ {t3:,.2f}</li>
+                    <li><b>Target 1 (T1):</b> ₹ / $ {t1:,.2f} | <b>Target 2 (T2):</b> ₹ / $ {t2:,.2f} \vert{} <b>Target 3 (T3):</b> ₹ / $ {t3:,.2f}</li>
                     <li><b>Risk-to-Reward Ratio (RR):</b> {rr_ratio}</li>
                 </ul>
                 <h4>🧮 Position Sizing (Capital: ₹{capital:,.0f} | Risk: {risk_pct}%):</h4>
@@ -408,9 +412,4 @@ with tab3:
     c4.metric("Active Streak", "3 Wins", "🔥")
     st.markdown("---")
     st.markdown("**Strategy-wise Win Rate Breakdown:**")
-    st.progress(0.78, text="ICT 2022 Model (78% Win Rate)")
-    st.progress(0.65, text="Silver Bullet Setup (65% Win Rate)")
-    st.progress(0.70, text="Power of 3 (AMD) (70% Win Rate)")
-
-st.markdown("---")
-st.markdown("<p style='text-align: center; color: #787b86;'>Institutional ICT AI Trading Terminal | Mobile PWA Optimized</p>", unsafe_allow_html=True)
+    st.progress(0.78, text="ICT 2022 Model (78% Win
