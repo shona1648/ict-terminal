@@ -23,13 +23,13 @@ st.markdown("""
 
 # Initialize Session State for 4-Category Independent Watchlists & Toggles
 if 'nse_watchlist' not in st.session_state:
-    st.session_state.nse_watchlist = ["NIFTY", "BANKNIFTY", "FINNIFTY", "RELIANCE", "TATASTEEL", "INFY"]
+    st.session_state.nse_watchlist = ["NIFTY", "BANKNIFTY", "FINNIFTY", "RELIANCE"]
 if 'crypto_watchlist' not in st.session_state:
-    st.session_state.crypto_watchlist = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT"]
+    st.session_state.crypto_watchlist = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
 if 'forex_watchlist' not in st.session_state:
-    st.session_state.forex_watchlist = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD"]
+    st.session_state.forex_watchlist = ["EURUSD", "GBPUSD", "USDJPY"]
 if 'mcx_watchlist' not in st.session_state:
-    st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "ZINC", "COPPER"]
+    st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
 if 'nse_toggle' not in st.session_state:
     st.session_state.nse_toggle = True
@@ -83,22 +83,22 @@ selected_market = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists & Toggles")
 
-# Strictly Isolated Category-wise Watchlists with Clean Dropdown Management
+# Category-wise Watchlist Manager with Clean Free Text Input & Inline Remove Selectbox
 if selected_market.startswith("NSE"):
     st.sidebar.markdown("**🟢 NSE Watchlist Manager**")
     st.session_state.nse_toggle = st.sidebar.toggle("NSE Alerts ON/OFF", value=st.session_state.nse_toggle, key="tgl_nse")
     
-    # Pre-defined options for NSE
-    available_nse = ["NIFTY", "BANKNIFTY", "FINNIFTY", "RELIANCE", "TATASTEEL", "INFY", "TCS", "HDFCBANK", "SBIN", "ITC"]
-    add_nse = st.sidebar.selectbox("Add Symbol to NSE", ["-- Select to add --"] + [s for s in available_nse if s not in st.session_state.nse_watchlist], key="add_nse_box")
-    if add_nse != "-- Select to add --":
-        if st.sidebar.button("Confirm Add NSE", key="conf_add_nse"):
-            if add_nse not in st.session_state.nse_watchlist:
-                st.session_state.nse_watchlist.append(add_nse)
+    new_nse = st.sidebar.text_input("Add Symbol to NSE", key="input_nse_box", placeholder="e.g. TATASTEEL")
+    if st.sidebar.button("Add to NSE", key="btn_nse"):
+        if new_nse:
+            sym = new_nse.strip().upper()
+            if sym not in st.session_state.nse_watchlist:
+                st.session_state.nse_watchlist.append(sym)
+                st.sidebar.success(f"Added {sym} to NSE!")
                 st.rerun()
-                
-    selected_rem_nse = st.sidebar.selectbox("📂 Remove Symbol from NSE", ["-- Select to remove --"] + st.session_state.nse_watchlist, key="drop_nse")
-    if selected_rem_nse != "-- Select to remove --":
+            
+    selected_rem_nse = st.sidebar.selectbox("📂 Current NSE Watchlist (Select to Remove)", ["-- Choose symbol to remove --"] + st.session_state.nse_watchlist, key="drop_nse")
+    if selected_rem_nse != "-- Choose symbol to remove --":
         if st.sidebar.button("❌ Remove Selected NSE Symbol", key="del_btn_nse"):
             st.session_state.nse_watchlist.remove(selected_rem_nse)
             st.rerun()
@@ -110,16 +110,17 @@ elif selected_market.startswith("Crypto"):
     st.sidebar.markdown("**🪙 Crypto Watchlist Manager**")
     st.session_state.crypto_toggle = st.sidebar.toggle("Crypto Alerts ON/OFF", value=st.session_state.crypto_toggle, key="tgl_crypto")
     
-    available_crypto = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "DOTUSDT", "MATICUSDT", "LINKUSDT"]
-    add_crypto = st.sidebar.selectbox("Add Symbol to Crypto", ["-- Select to add --"] + [s for s in available_crypto if s not in st.session_state.crypto_watchlist], key="add_crypto_box")
-    if add_crypto != "-- Select to add --":
-        if st.sidebar.button("Confirm Add Crypto", key="conf_add_crypto"):
-            if add_crypto not in st.session_state.crypto_watchlist:
-                st.session_state.crypto_watchlist.append(add_crypto)
+    new_crypto = st.sidebar.text_input("Add Symbol to Crypto", key="input_crypto_box", placeholder="e.g. BTCUSDT")
+    if st.sidebar.button("Add to Crypto", key="btn_crypto"):
+        if new_crypto:
+            sym = new_crypto.strip().upper()
+            if sym not in st.session_state.crypto_watchlist:
+                st.session_state.crypto_watchlist.append(sym)
+                st.sidebar.success(f"Added {sym} to Crypto!")
                 st.rerun()
-                
-    selected_rem_crypto = st.sidebar.selectbox("📂 Remove Symbol from Crypto", ["-- Select to remove --"] + st.session_state.crypto_watchlist, key="drop_crypto")
-    if selected_rem_crypto != "-- Select to remove --":
+            
+    selected_rem_crypto = st.sidebar.selectbox("📂 Current Crypto Watchlist (Select to Remove)", ["-- Choose symbol to remove --"] + st.session_state.crypto_watchlist, key="drop_crypto")
+    if selected_rem_crypto != "-- Choose symbol to remove --":
         if st.sidebar.button("❌ Remove Selected Crypto Symbol", key="del_btn_crypto"):
             st.session_state.crypto_watchlist.remove(selected_rem_crypto)
             st.rerun()
@@ -131,16 +132,17 @@ elif selected_market.startswith("FOREX"):
     st.sidebar.markdown("**💱 FOREX Watchlist Manager**")
     st.session_state.forex_toggle = st.sidebar.toggle("Forex Alerts ON/OFF", value=st.session_state.forex_toggle, key="tgl_forex")
     
-    available_forex = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "NZDUSD", "EURJPY", "GBPJPY"]
-    add_forex = st.sidebar.selectbox("Add Symbol to Forex", ["-- Select to add --"] + [s for s in available_forex if s not in st.session_state.forex_watchlist], key="add_forex_box")
-    if add_forex != "-- Select to add --":
-        if st.sidebar.button("Confirm Add Forex", key="conf_add_forex"):
-            if add_forex not in st.session_state.forex_watchlist:
-                st.session_state.forex_watchlist.append(add_forex)
+    new_forex = st.sidebar.text_input("Add Symbol to Forex", key="input_forex_box", placeholder="e.g. EURUSD")
+    if st.sidebar.button("Add to Forex", key="btn_forex"):
+        if new_forex:
+            sym = new_forex.strip().upper()
+            if sym not in st.session_state.forex_watchlist:
+                st.session_state.forex_watchlist.append(sym)
+                st.sidebar.success(f"Added {sym} to Forex!")
                 st.rerun()
-                
-    selected_rem_forex = st.sidebar.selectbox("📂 Remove Symbol from Forex", ["-- Select to remove --"] + st.session_state.forex_watchlist, key="drop_forex")
-    if selected_rem_forex != "-- Select to remove --":
+            
+    selected_rem_forex = st.sidebar.selectbox("📂 Current Forex Watchlist (Select to Remove)", ["-- Choose symbol to remove --"] + st.session_state.forex_watchlist, key="drop_forex")
+    if selected_rem_forex != "-- Choose symbol to remove --":
         if st.sidebar.button("❌ Remove Selected Forex Symbol", key="del_btn_forex"):
             st.session_state.forex_watchlist.remove(selected_rem_forex)
             st.rerun()
@@ -152,16 +154,17 @@ else:
     st.sidebar.markdown("**🛢️ MCX Watchlist Manager**")
     st.session_state.mcx_toggle = st.sidebar.toggle("MCX Alerts ON/OFF", value=st.session_state.mcx_toggle, key="tgl_mcx")
     
-    available_mcx = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "ZINC", "COPPER", "ALUMINIUM", "LEAD", "MENTHAOIL"]
-    add_mcx = st.sidebar.selectbox("Add Symbol to MCX", ["-- Select to add --"] + [s for s in available_mcx if s not in st.session_state.mcx_watchlist], key="add_mcx_box")
-    if add_mcx != "-- Select to add --":
-        if st.sidebar.button("Confirm Add MCX", key="conf_add_mcx"):
-            if add_mcx not in st.session_state.mcx_watchlist:
-                st.session_state.mcx_watchlist.append(add_mcx)
+    new_mcx = st.sidebar.text_input("Add Symbol to MCX", key="input_mcx_box", placeholder="e.g. CRUDEOIL")
+    if st.sidebar.button("Add to MCX", key="btn_mcx"):
+        if new_mcx:
+            sym = new_mcx.strip().upper()
+            if sym not in st.session_state.mcx_watchlist:
+                st.session_state.mcx_watchlist.append(sym)
+                st.sidebar.success(f"Added {sym} to MCX!")
                 st.rerun()
-                
-    selected_rem_mcx = st.sidebar.selectbox("📂 Remove Symbol from MCX", ["-- Select to remove --"] + st.session_state.mcx_watchlist, key="drop_mcx")
-    if selected_rem_mcx != "-- Select to remove --":
+            
+    selected_rem_mcx = st.sidebar.selectbox("📂 Current MCX Watchlist (Select to Remove)", ["-- Choose symbol to remove --"] + st.session_state.mcx_watchlist, key="drop_mcx")
+    if selected_rem_mcx != "-- Choose symbol to remove --":
         if st.sidebar.button("❌ Remove Selected MCX Symbol", key="del_btn_mcx"):
             st.session_state.mcx_watchlist.remove(selected_rem_mcx)
             st.rerun()
