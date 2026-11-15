@@ -291,41 +291,40 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Scanner & Engine", "📸 Manual Screensho
 with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
     
-    # 5 Options Filter for Select Target Asset Box
-    col_filter1, col_filter2 = st.columns(2)
-    with col_filter1:
-        scan_market_filter = st.selectbox(
-            "Filter Category for Scan",
-            ["All", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities", "NSE (Equity Cash & F&O)"]
+    # Unified Select Box containing All + 4 Markets directly
+    col1, col2 = st.columns(2)
+    with col1:
+        target_category = st.selectbox(
+            "Select Target Asset / Category for Scan",
+            ["All", "NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
         )
-    with col_filter2:
+    with col2:
         scan_mode = st.selectbox("Scan Mode", ["24/7 Autonomous Stream", "Instant Deep Scan"])
 
-    # Build filtered assets list based on user's main dashboard selection
-    if scan_market_filter == "All":
-        filtered_watchlist = (
+    # Determine asset list based on selection
+    if target_category == "All":
+        active_assets = (
             st.session_state.nse_watchlist + 
             st.session_state.crypto_watchlist + 
             st.session_state.forex_watchlist + 
             st.session_state.mcx_watchlist
         )
-    elif scan_market_filter.startswith("Crypto"):
-        filtered_watchlist = st.session_state.crypto_watchlist
-    elif scan_market_filter.startswith("FOREX"):
-        filtered_watchlist = st.session_state.forex_watchlist
-    elif scan_market_filter.startswith("MCX"):
-        filtered_watchlist = st.session_state.mcx_watchlist
+        asset_input = st.selectbox("Select Specific Asset", active_assets)
+    elif target_category.startswith("NSE"):
+        asset_input = st.selectbox("Select Specific Asset", st.session_state.nse_watchlist)
+    elif target_category.startswith("Crypto"):
+        asset_input = st.selectbox("Select Specific Asset", st.session_state.crypto_watchlist)
+    elif target_category.startswith("FOREX"):
+        asset_input = st.selectbox("Select Specific Asset", st.session_state.forex_watchlist)
     else:
-        filtered_watchlist = st.session_state.nse_watchlist
+        asset_input = st.selectbox("Select Specific Asset", st.session_state.mcx_watchlist)
 
-    st.info(f"📋 **Active Watchlist Symbols ({scan_market_filter}):** {', '.join(filtered_watchlist)}")
-    
-    asset_input = st.selectbox("Select Target Asset for Scan", filtered_watchlist)
+    st.info(f"📋 **Selected Asset for Scan:** `{asset_input}`")
 
     if not is_active_toggle:
         st.warning(f"⚠️ **Alerts for {selected_market} are currently toggled OFF in sidebar!** Scanning in reference mode.")
 
-    current_live_price = get_live_price(asset_input, scan_market_filter)
+    current_live_price = get_live_price(asset_input, target_category)
     st.caption(f"📡 **Live Market Feed ({asset_input}):** ₹ / $ {current_live_price:,.2f}")
 
     if st.button("Run Institutional Scan & Match Strategy"):
