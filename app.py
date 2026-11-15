@@ -45,7 +45,6 @@ if 'mcx_toggle' not in st.session_state:
 def get_live_price(symbol, market_type):
     sym = symbol.strip().upper()
     try:
-        # Detect market type dynamically if "All" is selected
         if "-" in sym or sym.endswith("-USD"):
             url = f"https://api.binance.com/api/v3/ticker/price?symbol={sym.replace('-', '')}"
             res = requests.get(url, timeout=2).json()
@@ -133,28 +132,18 @@ CONFIRMATION_FILTERS = [
     "Zero-Line Crossover", "Multi-Timeframe Sweep"
 ]
 
-# Sidebar Controls (Updated with 5 options including "All")
+# Sidebar Controls (Original 4 Options Intact)
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 selected_market = st.sidebar.selectbox(
     "Select Market Category",
-    ["All", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities", "NSE (Equity Cash & F&O)"]
+    ["NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
 )
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists & Toggles")
 
-# Handle Watchlist Display & Managers based on Selection
-if selected_market == "All":
-    st.sidebar.markdown("**🌐 Global Master Watchlist (All Markets Active)**")
-    current_watchlist = (
-        st.session_state.nse_watchlist + 
-        st.session_state.crypto_watchlist + 
-        st.session_state.forex_watchlist + 
-        st.session_state.mcx_watchlist
-    )
-    is_active_toggle = True
-
-elif selected_market.startswith("NSE"):
+# Category-wise Watchlist Managers with Inline Remove Buttons
+if selected_market.startswith("NSE"):
     st.sidebar.markdown("**🟢 NSE Watchlist (Dhan Powered)**")
     st.session_state.nse_toggle = st.sidebar.toggle("NSE Alerts ON/OFF", value=st.session_state.nse_toggle, key="tgl_nse")
     
@@ -183,7 +172,6 @@ elif selected_market.startswith("NSE"):
             else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
-    current_watchlist = st.session_state.nse_watchlist
     is_active_toggle = st.session_state.nse_toggle
 
 elif selected_market.startswith("Crypto"):
@@ -215,7 +203,6 @@ elif selected_market.startswith("Crypto"):
             else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
-    current_watchlist = st.session_state.crypto_watchlist
     is_active_toggle = st.session_state.crypto_toggle
 
 elif selected_market.startswith("FOREX"):
@@ -246,7 +233,6 @@ elif selected_market.startswith("FOREX"):
             else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
-    current_watchlist = st.session_state.forex_watchlist
     is_active_toggle = st.session_state.forex_toggle
 
 else:
@@ -278,7 +264,6 @@ else:
             else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
-    current_watchlist = st.session_state.mcx_watchlist
     is_active_toggle = st.session_state.mcx_toggle
 
 st.sidebar.markdown("---")
@@ -305,18 +290,42 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Scanner & Engine", "📸 Manual Screensho
 
 with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
-    st.info(f"📋 **Active Watchlist Symbols ({selected_market}):** {', '.join(current_watchlist)}")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        asset_input = st.selectbox("Select Target Asset for Scan", current_watchlist)
-    with col2:
+    # 5 Options Filter for Select Target Asset Box
+    col_filter1, col_filter2 = st.columns(2)
+    with col_filter1:
+        scan_market_filter = st.selectbox(
+            "Filter Category for Scan",
+            ["All", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities", "NSE (Equity Cash & F&O)"]
+        )
+    with col_filter2:
         scan_mode = st.selectbox("Scan Mode", ["24/7 Autonomous Stream", "Instant Deep Scan"])
+
+    # Build filtered assets list based on user's main dashboard selection
+    if scan_market_filter == "All":
+        filtered_watchlist = (
+            st.session_state.nse_watchlist + 
+            st.session_state.crypto_watchlist + 
+            st.session_state.forex_watchlist + 
+            st.session_state.mcx_watchlist
+        )
+    elif scan_market_filter.startswith("Crypto"):
+        filtered_watchlist = st.session_state.crypto_watchlist
+    elif scan_market_filter.startswith("FOREX"):
+        filtered_watchlist = st.session_state.forex_watchlist
+    elif scan_market_filter.startswith("MCX"):
+        filtered_watchlist = st.session_state.mcx_watchlist
+    else:
+        filtered_watchlist = st.session_state.nse_watchlist
+
+    st.info(f"📋 **Active Watchlist Symbols ({scan_market_filter}):** {', '.join(filtered_watchlist)}")
+    
+    asset_input = st.selectbox("Select Target Asset for Scan", filtered_watchlist)
 
     if not is_active_toggle:
         st.warning(f"⚠️ **Alerts for {selected_market} are currently toggled OFF in sidebar!** Scanning in reference mode.")
 
-    current_live_price = get_live_price(asset_input, selected_market)
+    current_live_price = get_live_price(asset_input, scan_market_filter)
     st.caption(f"📡 **Live Market Feed ({asset_input}):** ₹ / $ {current_live_price:,.2f}")
 
     if st.button("Run Institutional Scan & Match Strategy"):
@@ -329,15 +338,15 @@ with tab1:
             sl_price = entry_price * 0.992 if score % 2 == 0 else entry_price * 1.008
             risk_per_unit = abs(entry_price - sl_price)
             
-            if "NSE" in selected_market or asset_input in st.session_state.nse_watchlist:
+            if asset_input in st.session_state.nse_watchlist:
                 lot_size = 25
                 qty = max(1, int(allowed_risk_amount / (risk_per_unit * lot_size))) * lot_size
                 asset_label = f"NSE | {asset_input}"
-            elif "MCX" in selected_market or asset_input in st.session_state.mcx_watchlist:
+            elif asset_input in st.session_state.mcx_watchlist:
                 multiplier = 100
                 qty = max(1, int(allowed_risk_amount / (risk_per_unit * multiplier)))
                 asset_label = f"MCX | {asset_input}"
-            elif "FOREX" in selected_market or asset_input in st.session_state.forex_watchlist:
+            elif asset_input in st.session_state.forex_watchlist:
                 qty = round(allowed_risk_amount / (risk_per_unit * 10), 2)
                 asset_label = f"FOREX | {asset_input}"
             else:
