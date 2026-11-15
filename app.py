@@ -129,7 +129,7 @@ CONFIRMATION_FILTERS = [
     "Zero-Line Crossover", "Multi-Timeframe Sweep"
 ]
 
-# Sidebar Controls (Now with "All" included)
+# Sidebar Controls (With "All" option included)
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 selected_market = st.sidebar.selectbox(
     "Select Market Category",
@@ -367,7 +367,7 @@ with tab1:
                 <ul>
                     <li><b>Live Reference Price:</b> ₹ / $ {entry_price:,.2f}</li>
                     <li><b>Stop Loss (SL):</b> ₹ / $ {sl_price:,.2f}</li>
-                    <li><b>Target 1 (T1):</b> ₹ / $ {t1:,.2f} | <b>Target 2 (T2):</b> ₹ / $ {t2:,.2f} \vert{} <b>Target 3 (T3):</b> ₹ / $ {t3:,.2f}</li>
+                    <li><b>Target 1 (T1):</b> ₹ / $ {t1:,.2f} | <b>Target 2 (T2):</b> ₹ / $ {t2:,.2f} | <b>Target 3 (T3):</b> ₹ / $ {t3:,.2f}</li>
                     <li><b>Risk-to-Reward Ratio (RR):</b> {rr_ratio}</li>
                 </ul>
                 <h4>🧮 Position Sizing (Capital: ₹{capital:,.0f} | Risk: {risk_pct}%):</h4>
@@ -412,4 +412,9 @@ with tab3:
     c4.metric("Active Streak", "3 Wins", "🔥")
     st.markdown("---")
     st.markdown("**Strategy-wise Win Rate Breakdown:**")
-    st.progress(0.78, text="ICT 2022 Model (78% Win
+    st.progress(0.78, text="ICT 2022 Model (78% Win Rate)")
+    st.progress(0.65, text="Silver Bullet Setup (65% Win Rate)")
+    st.progress(0.70, text="Power of 3 (AMD) (70% Win Rate)")
+
+st.markdown("---")
+st.markdown("<p style='text-align: center; color: #787b86;'>Institutional ICT AI Trading Terminal | Mobile PWA Optimized</p>", unsafe_allow_html=True)
