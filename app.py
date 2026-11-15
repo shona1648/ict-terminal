@@ -45,20 +45,17 @@ if 'mcx_toggle' not in st.session_state:
 def get_live_price(symbol, market_type):
     sym = symbol.strip().upper()
     try:
-        if "Crypto" in market_type:
+        # Detect market type dynamically if "All" is selected
+        if "-" in sym or sym.endswith("-USD"):
             url = f"https://api.binance.com/api/v3/ticker/price?symbol={sym.replace('-', '')}"
             res = requests.get(url, timeout=2).json()
             return float(res.get("price", 1000.0))
-            
-        elif "NSE" in market_type or "MCX" in market_type:
-            if "DHAN_CLIENT_ID" in st.secrets and "DHAN_ACCESS_TOKEN" in st.secrets:
-                headers = {
-                    "access-token": st.secrets["DHAN_ACCESS_TOKEN"],
-                    "client-id": st.secrets["DHAN_CLIENT_ID"],
-                    "Content-Type": "application/json"
-                }
-                pass
-            
+        elif len(sym) == 6 and sym.isalpha():
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}=X"
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            res = requests.get(url, headers=headers, timeout=2).json()
+            return float(res['chart']['result'][0]['meta']['regularMarketPrice'])
+        else:
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
             if "NSE" in market_type and not sym.endswith(".NS") and sym not in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"]:
                 url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}.NS"
@@ -69,7 +66,6 @@ def get_live_price(symbol, market_type):
             res = requests.get(url, headers=headers, timeout=2).json()
             price = res['chart']['result'][0]['meta']['regularMarketPrice']
             return float(price)
-            
     except:
         pass
     return 1000.00
@@ -137,18 +133,28 @@ CONFIRMATION_FILTERS = [
     "Zero-Line Crossover", "Multi-Timeframe Sweep"
 ]
 
-# Sidebar Controls
+# Sidebar Controls (Updated with 5 options including "All")
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 selected_market = st.sidebar.selectbox(
     "Select Market Category",
-    ["NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
+    ["All", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities", "NSE (Equity Cash & F&O)"]
 )
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists & Toggles")
 
-# Category-wise Watchlist Managers with Inline Remove Buttons
-if selected_market.startswith("NSE"):
+# Handle Watchlist Display & Managers based on Selection
+if selected_market == "All":
+    st.sidebar.markdown("**🌐 Global Master Watchlist (All Markets Active)**")
+    current_watchlist = (
+        st.session_state.nse_watchlist + 
+        st.session_state.crypto_watchlist + 
+        st.session_state.forex_watchlist + 
+        st.session_state.mcx_watchlist
+    )
+    is_active_toggle = True
+
+elif selected_market.startswith("NSE"):
     st.sidebar.markdown("**🟢 NSE Watchlist (Dhan Powered)**")
     st.session_state.nse_toggle = st.sidebar.toggle("NSE Alerts ON/OFF", value=st.session_state.nse_toggle, key="tgl_nse")
     
@@ -323,15 +329,15 @@ with tab1:
             sl_price = entry_price * 0.992 if score % 2 == 0 else entry_price * 1.008
             risk_per_unit = abs(entry_price - sl_price)
             
-            if "NSE" in selected_market:
+            if "NSE" in selected_market or asset_input in st.session_state.nse_watchlist:
                 lot_size = 25
                 qty = max(1, int(allowed_risk_amount / (risk_per_unit * lot_size))) * lot_size
                 asset_label = f"NSE | {asset_input}"
-            elif "MCX" in selected_market:
+            elif "MCX" in selected_market or asset_input in st.session_state.mcx_watchlist:
                 multiplier = 100
                 qty = max(1, int(allowed_risk_amount / (risk_per_unit * multiplier)))
                 asset_label = f"MCX | {asset_input}"
-            elif "FOREX" in selected_market:
+            elif "FOREX" in selected_market or asset_input in st.session_state.forex_watchlist:
                 qty = round(allowed_risk_amount / (risk_per_unit * 10), 2)
                 asset_label = f"FOREX | {asset_input}"
             else:
