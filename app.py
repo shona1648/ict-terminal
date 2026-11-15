@@ -22,7 +22,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Session State for 4-Category Independent Watchlists & Toggles
+# Initialize Session State Watchlists & Toggles
 if 'nse_watchlist' not in st.session_state:
     st.session_state.nse_watchlist = ["NIFTY", "BANKNIFTY", "RELIANCE", "TATASTEEL"]
 if 'crypto_watchlist' not in st.session_state:
@@ -32,7 +32,6 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# Initialize Toggles cleanly in session state
 if 'nse_toggle' not in st.session_state: st.session_state.nse_toggle = True
 if 'crypto_toggle' not in st.session_state: st.session_state.crypto_toggle = True
 if 'forex_toggle' not in st.session_state: st.session_state.forex_toggle = True
@@ -140,11 +139,11 @@ selected_market = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists & Toggles")
 
-# Global Toggles Rendered Safely Outside Watchlist Blocks
-st.session_state.nse_toggle = st.sidebar.toggle("NSE Alerts ON/OFF", value=st.session_state.nse_toggle, key="tgl_nse")
-st.session_state.crypto_toggle = st.sidebar.toggle("Crypto Alerts ON/OFF", value=st.session_state.crypto_toggle, key="tgl_crypto")
-st.session_state.forex_toggle = st.sidebar.toggle("Forex Alerts ON/OFF", value=st.session_state.forex_toggle, key="tgl_forex")
-st.session_state.mcx_toggle = st.sidebar.toggle("MCX Alerts ON/OFF", value=st.session_state.mcx_toggle, key="tgl_mcx")
+# Independent Toggles with Direct Session State Binding
+st.session_state.nse_toggle = st.sidebar.toggle("NSE Alerts ON/OFF", value=st.session_state.nse_toggle, key="master_tgl_nse")
+st.session_state.crypto_toggle = st.sidebar.toggle("Crypto Alerts ON/OFF", value=st.session_state.crypto_toggle, key="master_tgl_crypto")
+st.session_state.forex_toggle = st.sidebar.toggle("Forex Alerts ON/OFF", value=st.session_state.forex_toggle, key="master_tgl_forex")
+st.session_state.mcx_toggle = st.sidebar.toggle("MCX Alerts ON/OFF", value=st.session_state.mcx_toggle, key="master_tgl_mcx")
 
 st.sidebar.markdown("---")
 
@@ -175,7 +174,6 @@ if selected_market.startswith("NSE"):
                 st.rerun()
             else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
-    is_active_toggle = st.session_state.nse_toggle
 
 elif selected_market.startswith("Crypto"):
     st.sidebar.markdown("**🪙 Crypto Watchlist**")
@@ -203,7 +201,6 @@ elif selected_market.startswith("Crypto"):
                 st.rerun()
             else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
-    is_active_toggle = st.session_state.crypto_toggle
 
 elif selected_market.startswith("FOREX"):
     st.sidebar.markdown("**💱 FOREX Watchlist**")
@@ -230,7 +227,6 @@ elif selected_market.startswith("FOREX"):
                 st.rerun()
             else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
-    is_active_toggle = st.session_state.forex_toggle
 
 else:
     st.sidebar.markdown("**🛢️ MCX Watchlist (Dhan Powered)**")
@@ -258,11 +254,10 @@ else:
                 st.rerun()
             else:
                 st.sidebar.warning("⚠️ Keep at least 1 symbol!")
-    is_active_toggle = st.session_state.mcx_toggle
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🕒 Session & Killzone Toggle")
-st.session_state.killzone_toggle = st.sidebar.toggle("Active Session / Killzone (Visual)", value=st.session_state.killzone_toggle, key="tgl_killzone")
+st.session_state.killzone_toggle = st.sidebar.toggle("Active Session / Killzone (Visual)", value=st.session_state.killzone_toggle, key="master_tgl_killzone")
 
 if st.session_state.killzone_toggle:
     st.sidebar.success("🟢 Killzone Active: High Probability Array Setup")
@@ -302,19 +297,24 @@ with tab1:
             st.session_state.mcx_watchlist
         )
         asset_input = random.choice(all_assets) if all_assets else "NIFTY"
+        current_toggle_status = (st.session_state.nse_toggle or st.session_state.crypto_toggle or st.session_state.forex_toggle or st.session_state.mcx_toggle)
     elif target_category.startswith("NSE"):
         asset_input = random.choice(st.session_state.nse_watchlist) if st.session_state.nse_watchlist else "NIFTY"
+        current_toggle_status = st.session_state.nse_toggle
     elif target_category.startswith("Crypto"):
         asset_input = random.choice(st.session_state.crypto_watchlist) if st.session_state.crypto_watchlist else "BTC-USD"
+        current_toggle_status = st.session_state.crypto_toggle
     elif target_category.startswith("FOREX"):
         asset_input = random.choice(st.session_state.forex_watchlist) if st.session_state.forex_watchlist else "EURUSD"
+        current_toggle_status = st.session_state.forex_toggle
     else:
         asset_input = random.choice(st.session_state.mcx_watchlist) if st.session_state.mcx_watchlist else "CRUDEOIL"
+        current_toggle_status = st.session_state.mcx_toggle
 
     st.info(f"📋 **Scanning Category:** `{target_category}` | **Auto-Selected Asset:** `{asset_input}`")
 
-    if not is_active_toggle:
-        st.warning(f"⚠️ **Alerts for {selected_market} are currently toggled OFF in sidebar!** Scanning in reference mode.")
+    if not current_toggle_status:
+        st.warning(f"⚠️ **Alerts for {target_category} are currently toggled OFF in sidebar!** Scanning in reference mode.")
 
     current_live_price = get_live_price(asset_input, target_category)
     st.caption(f"📡 **Live Market Feed ({asset_input}):** ₹ / $ {current_live_price:,.2f}")
@@ -349,7 +349,7 @@ with tab1:
             t3 = entry_price + (risk_per_unit * 5)
             rr_ratio = "1 : 4.5"
 
-            if score >= 5:
+            if score >= 5 and current_toggle_status:
                 st.markdown(f"""
                 <div class="alert-box">
                 <h3>🎯 STRATEGY MATCHED: {matched_strat} (Rank 1 Setup)</h3>
