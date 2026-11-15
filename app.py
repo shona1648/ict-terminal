@@ -22,7 +22,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Session State Watchlists & Toggles
+# Initialize Session State Watchlists & Toggles Safely
 if 'nse_watchlist' not in st.session_state:
     st.session_state.nse_watchlist = ["NIFTY", "BANKNIFTY", "RELIANCE", "TATASTEEL"]
 if 'crypto_watchlist' not in st.session_state:
@@ -137,17 +137,18 @@ selected_market = st.sidebar.selectbox(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📂 Independent Watchlists & Toggles")
+st.sidebar.markdown("### 🔔 Global Market Toggles")
 
-# Independent Toggles with Direct Session State Binding
-st.session_state.nse_toggle = st.sidebar.toggle("NSE Alerts ON/OFF", value=st.session_state.nse_toggle, key="master_tgl_nse")
-st.session_state.crypto_toggle = st.sidebar.toggle("Crypto Alerts ON/OFF", value=st.session_state.crypto_toggle, key="master_tgl_crypto")
-st.session_state.forex_toggle = st.sidebar.toggle("Forex Alerts ON/OFF", value=st.session_state.forex_toggle, key="master_tgl_forex")
-st.session_state.mcx_toggle = st.sidebar.toggle("MCX Alerts ON/OFF", value=st.session_state.mcx_toggle, key="master_tgl_mcx")
+# --- MASTER TOGGLES PLACED SAFELY AT THE TOP LEVEL (UNCONDITIONAL) ---
+st.session_state.nse_toggle = st.sidebar.toggle("🟢 NSE Alerts ON/OFF", value=st.session_state.nse_toggle, key="top_tgl_nse")
+st.session_state.crypto_toggle = st.sidebar.toggle("🪙 Crypto Alerts ON/OFF", value=st.session_state.crypto_toggle, key="top_tgl_crypto")
+st.session_state.forex_toggle = st.sidebar.toggle("💱 Forex Alerts ON/OFF", value=st.session_state.forex_toggle, key="top_tgl_forex")
+st.session_state.mcx_toggle = st.sidebar.toggle("🛢️ MCX Alerts ON/OFF", value=st.session_state.mcx_toggle, key="top_tgl_mcx")
 
 st.sidebar.markdown("---")
+st.sidebar.markdown("### 📂 Independent Watchlists")
 
-# Category-wise Watchlist Managers
+# Category-wise Watchlist Managers (Cleaned up from toggle conflicts)
 if selected_market.startswith("NSE"):
     st.sidebar.markdown("**🟢 NSE Watchlist (Dhan Powered)**")
     new_nse = st.sidebar.text_input("Add Symbol to NSE", key="input_nse_box", placeholder="e.g. RELIANCE, SBIN")
@@ -257,7 +258,7 @@ else:
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🕒 Session & Killzone Toggle")
-st.session_state.killzone_toggle = st.sidebar.toggle("Active Session / Killzone (Visual)", value=st.session_state.killzone_toggle, key="master_tgl_killzone")
+st.session_state.killzone_toggle = st.sidebar.toggle("Active Session / Killzone (Visual)", value=st.session_state.killzone_toggle, key="top_tgl_killzone")
 
 if st.session_state.killzone_toggle:
     st.sidebar.success("🟢 Killzone Active: High Probability Array Setup")
