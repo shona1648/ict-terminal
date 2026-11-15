@@ -291,35 +291,40 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Scanner & Engine", "📸 Manual Screensho
 with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
     
-    # Unified Select Box containing All + 4 Markets directly
+    # Single Clean Dropdown for Market/Category Selection
     col1, col2 = st.columns(2)
     with col1:
         target_category = st.selectbox(
-            "Select Target Asset / Category for Scan",
-            ["All", "NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
+            "Select Market / Category for Scan",
+            ["All Markets", "NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
         )
     with col2:
         scan_mode = st.selectbox("Scan Mode", ["24/7 Autonomous Stream", "Instant Deep Scan"])
 
-    # Determine asset list based on selection
-    if target_category == "All":
-        active_assets = (
+    # Automatically pick/scan assets based on selected category
+    if target_category == "All Markets":
+        all_assets = (
             st.session_state.nse_watchlist + 
             st.session_state.crypto_watchlist + 
             st.session_state.forex_watchlist + 
             st.session_state.mcx_watchlist
         )
-        asset_input = st.selectbox("Select Specific Asset", active_assets)
+        asset_input = random.choice(all_assets) if all_assets else "NIFTY"
+        market_label = "ALL"
     elif target_category.startswith("NSE"):
-        asset_input = st.selectbox("Select Specific Asset", st.session_state.nse_watchlist)
+        asset_input = random.choice(st.session_state.nse_watchlist) if st.session_state.nse_watchlist else "NIFTY"
+        market_label = "NSE"
     elif target_category.startswith("Crypto"):
-        asset_input = st.selectbox("Select Specific Asset", st.session_state.crypto_watchlist)
+        asset_input = random.choice(st.session_state.crypto_watchlist) if st.session_state.crypto_watchlist else "BTC-USD"
+        market_label = "Crypto"
     elif target_category.startswith("FOREX"):
-        asset_input = st.selectbox("Select Specific Asset", st.session_state.forex_watchlist)
+        asset_input = random.choice(st.session_state.forex_watchlist) if st.session_state.forex_watchlist else "EURUSD"
+        market_label = "FOREX"
     else:
-        asset_input = st.selectbox("Select Specific Asset", st.session_state.mcx_watchlist)
+        asset_input = random.choice(st.session_state.mcx_watchlist) if st.session_state.mcx_watchlist else "CRUDEOIL"
+        market_label = "MCX"
 
-    st.info(f"📋 **Selected Asset for Scan:** `{asset_input}`")
+    st.info(f"📋 **Scanning Category:** `{target_category}` | **Auto-Selected Asset:** `{asset_input}`")
 
     if not is_active_toggle:
         st.warning(f"⚠️ **Alerts for {selected_market} are currently toggled OFF in sidebar!** Scanning in reference mode.")
@@ -357,7 +362,7 @@ with tab1:
             t3 = entry_price + (risk_per_unit * 5)
             rr_ratio = "1 : 4.5"
 
-            if score >= 5 and is_active_toggle:
+            if score >= 5:
                 st.markdown(f"""
                 <div class="alert-box">
                 <h3>🎯 STRATEGY MATCHED: {matched_strat} (Rank 1 Setup)</h3>
