@@ -26,7 +26,7 @@ st.markdown("""
 if 'nse_watchlist' not in st.session_state:
     st.session_state.nse_watchlist = ["NIFTY", "BANKNIFTY", "RELIANCE", "TATASTEEL"]
 if 'crypto_watchlist' not in st.session_state:
-    st.session_state.crypto_watchlist = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    st.session_state.crypto_watchlist = ["BTC-USD", "ETH-USD", "SOL-USD"]
 if 'forex_watchlist' not in st.session_state:
     st.session_state.forex_watchlist = ["EURUSD", "GBPUSD", "USDJPY"]
 if 'mcx_watchlist' not in st.session_state:
@@ -41,42 +41,45 @@ if 'forex_toggle' not in st.session_state:
 if 'mcx_toggle' not in st.session_state:
     st.session_state.mcx_toggle = True
 
-# --- HYBRID LIVE DATA FETCHING (Binance for Crypto + Dhan API Ready for NSE/MCX) ---
+# --- UNIFIED LIVE DATA FETCHING (Yahoo Finance Public API for All Markets) ---
 def get_live_price(symbol, market_type):
     sym = symbol.strip().upper()
     try:
-        if "Crypto" in market_type:
-            # Binance Free Public Ticker API (Real-time & Accurate)
-            url = f"https://api.binance.com/api/v3/ticker/price?symbol={sym}"
-            res = requests.get(url, timeout=2).json()
-            return float(res.get("price", 1000.0))
-            
-        elif "NSE" in market_type or "MCX" in market_type:
-            # Check if user has configured Dhan API credentials in Streamlit secrets safely
-            if "DHAN_CLIENT_ID" in st.secrets and "DHAN_ACCESS_TOKEN" in st.secrets:
-                headers = {
-                    "access-token": st.secrets["DHAN_ACCESS_TOKEN"],
-                    "client-id": st.secrets["DHAN_CLIENT_ID"],
-                    "Content-Type": "application/json"
-                }
-                # Dhan API integration point
-                pass
-            
-            # Fallback public feed for instant testing
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
+        
+        if "NSE" in market_type and not sym.endswith(".NS") and sym not in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"]:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}.NS"
+        elif "MCX" in market_type and not sym.endswith("=F"):
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}=F"
+        elif "CRYPTO" in market_type.upper() and not sym.endswith("-USD"):
+            # Auto format crypto to Yahoo Finance ticker standard if user types BTC
+            sym = sym + "-USD"
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
-            if "NSE" in market_type and not sym.endswith(".NS") and sym not in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"]:
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}.NS"
-            elif "MCX" in market_type and not sym.endswith("=F"):
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}=F"
-                
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            res = requests.get(url, headers=headers, timeout=2).json()
-            price = res['chart']['result'][0]['meta']['regularMarketPrice']
-            return float(price)
-            
+
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        res = requests.get(url, headers=headers, timeout=3).json()
+        price = res['chart']['result'][0]['meta']['regularMarketPrice']
+        return float(price)
     except:
         pass
     return 1000.00 # Institutional baseline reference fallback
+
+# --- STRICT VALIDATION FOR CRYPTO ---
+def verify_crypto_symbol(symbol):
+    sym = symbol.strip().upper()
+    # Auto-format short names (e.g. BTC -> BTC-USD)
+    if not sym.endswith("-USD") and not sym.endswith("=F"):
+        sym = sym + "-USD"
+        
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        res = requests.get(url, headers=headers, timeout=3).json()
+        if res.get('chart') and res['chart'].get('result'):
+            return True, sym
+    except:
+        pass
+    return False, sym
 
 # --- 12 CORE STRATEGIES LIBRARY ---
 STRATEGIES = [
@@ -109,7 +112,7 @@ st.sidebar.markdown("### 📂 Independent Watchlists & Toggles")
 
 # Category-wise Watchlist Managers
 if selected_market.startswith("NSE"):
-    st.sidebar.markdown("**🟢 NSE Watchlist Manager (Dhan Powered)**")
+    st.sidebar.markdown("**🟢 NSE Watchlist Manager**")
     st.session_state.nse_toggle = st.sidebar.toggle("NSE Alerts ON/OFF", value=st.session_state.nse_toggle, key="tgl_nse")
     new_nse = st.sidebar.text_input("Add Symbol to NSE", key="input_nse_box", placeholder="e.g. RELIANCE, SBIN")
     if st.sidebar.button("Add to NSE", key="btn_nse"):
@@ -132,20 +135,21 @@ if selected_market.startswith("NSE"):
     is_active_toggle = st.session_state.nse_toggle
 
 elif selected_market.startswith("Crypto"):
-    st.sidebar.markdown("**🪙 Crypto Watchlist Manager (Binance Powered)**")
+    st.sidebar.markdown("**🪙 Crypto Watchlist Manager (Yahoo Finance Tickers)**")
     st.session_state.crypto_toggle = st.sidebar.toggle("Crypto Alerts ON/OFF", value=st.session_state.crypto_toggle, key="tgl_crypto")
-    new_crypto = st.sidebar.text_input("Add Symbol to Crypto", key="input_crypto_box", placeholder="e.g. BTCUSDT")
+    new_crypto = st.sidebar.text_input("Add Symbol to Crypto", key="input_crypto_box", placeholder="e.g. BTC or BTC-USD")
     if st.sidebar.button("Add to Crypto", key="btn_crypto"):
         if new_crypto:
-            sym = new_crypto.strip().upper()
-            if sym in st.session_state.crypto_watchlist:
-                st.sidebar.error(f"⚠️ '{sym}' already exists!")
-            elif sym.endswith("USDT") or sym.endswith("BTC"):
-                st.session_state.crypto_watchlist.append(sym)
-                st.sidebar.success(f"✅ Added {sym} to Crypto!")
-                st.rerun()
+            is_valid, verified_sym = verify_crypto_symbol(new_crypto)
+            if is_valid:
+                if verified_sym in st.session_state.crypto_watchlist:
+                    st.sidebar.warning(f"⚠️ '{verified_sym}' already exists!")
+                else:
+                    st.session_state.crypto_watchlist.append(verified_sym)
+                    st.sidebar.success(f"✅ Verified & Added {verified_sym}!")
+                    st.rerun()
             else:
-                st.sidebar.error("❌ Must end with USDT or BTC (e.g. BTCUSDT)")
+                st.sidebar.error(f"❌ '{new_crypto.upper()}' is not a valid cryptocurrency ticker!")
                 
     selected_rem_crypto = st.sidebar.selectbox("📂 Remove from Crypto", ["-- Choose to remove --"] + st.session_state.crypto_watchlist, key="drop_crypto")
     if selected_rem_crypto != "-- Choose to remove --" and st.sidebar.button("❌ Remove Crypto", key="del_crypto"):
@@ -178,7 +182,7 @@ elif selected_market.startswith("FOREX"):
     is_active_toggle = st.session_state.forex_toggle
 
 else:
-    st.sidebar.markdown("**🛢️ MCX Watchlist Manager (Dhan Powered)**")
+    st.sidebar.markdown("**🛢️ MCX Watchlist Manager**")
     st.session_state.mcx_toggle = st.sidebar.toggle("MCX Alerts ON/OFF", value=st.session_state.mcx_toggle, key="tgl_mcx")
     new_mcx = st.sidebar.text_input("Add Symbol to MCX", key="input_mcx_box", placeholder="e.g. CRUDEOIL")
     if st.sidebar.button("Add to MCX", key="btn_mcx"):
@@ -236,7 +240,6 @@ with tab1:
     if not is_active_toggle:
         st.warning(f"⚠️ **Alerts for {selected_market} are currently toggled OFF in sidebar!** Scanning in reference mode.")
 
-    # Fetch live price dynamically
     current_live_price = get_live_price(asset_input, selected_market)
     st.caption(f"📡 **Live Market Feed ({asset_input}):** ₹ / $ {current_live_price:,.2f}")
 
