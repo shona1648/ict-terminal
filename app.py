@@ -21,6 +21,25 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Initialize Session State for 4-Category Independent Watchlists & Toggles
+if 'nse_watchlist' not in st.session_state:
+    st.session_state.nse_watchlist = ["NIFTY", "BANKNIFTY", "FINNIFTY", "RELIANCE"]
+if 'crypto_watchlist' not in st.session_state:
+    st.session_state.crypto_watchlist = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+if 'forex_watchlist' not in st.session_state:
+    st.session_state.forex_watchlist = ["EURUSD", "GBPUSD", "USDJPY"]
+if 'mcx_watchlist' not in st.session_state:
+    st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
+
+if 'nse_toggle' not in st.session_state:
+    st.session_state.nse_toggle = True
+if 'crypto_toggle' not in st.session_state:
+    st.session_state.crypto_toggle = True
+if 'forex_toggle' not in st.session_state:
+    st.session_state.forex_toggle = True
+if 'mcx_toggle' not in st.session_state:
+    st.session_state.mcx_toggle = True
+
 # --- 12 CORE STRATEGIES LIBRARY ---
 STRATEGIES = [
     "ICT 2022 Model",
@@ -62,6 +81,86 @@ selected_market = st.sidebar.selectbox(
 )
 
 st.sidebar.markdown("---")
+st.sidebar.markdown("### 📂 Independent Watchlists & Toggles")
+
+# Category-wise Watchlist Manager inside Sidebar
+if selected_market.startswith("NSE"):
+    st.sidebar.markdown("**🟢 NSE Watchlist Manager**")
+    st.session_state.nse_toggle = st.sidebar.toggle("NSE Alerts ON/OFF", value=st.session_state.nse_toggle)
+    
+    add_symbol = st.sidebar.text_input("Add Symbol (/add_nse)")
+    if st.sidebar.button("Add to NSE"):
+        if add_symbol and add_symbol.upper() not in st.session_state.nse_watchlist:
+            st.session_state.nse_watchlist.append(add_symbol.upper())
+            st.sidebar.success(f"Added {add_symbol.upper()} to NSE")
+            
+    rem_symbol = st.sidebar.selectbox("Remove Symbol (/remove_nse)", ["Select to remove"] + st.session_state.nse_watchlist)
+    if st.sidebar.button("Remove from NSE") and rem_symbol != "Select to remove":
+        st.session_state.nse_watchlist.remove(rem_symbol)
+        st.sidebar.warning(f"Removed {rem_symbol}")
+        st.rerun()
+        
+    current_watchlist = st.session_state.nse_watchlist
+    is_active_toggle = st.session_state.nse_toggle
+
+elif selected_market.startswith("Crypto"):
+    st.sidebar.markdown("**🪙 Crypto Watchlist Manager**")
+    st.session_state.crypto_toggle = st.sidebar.toggle("Crypto Alerts ON/OFF", value=st.session_state.crypto_toggle)
+    
+    add_symbol = st.sidebar.text_input("Add Symbol (/add_crypto)")
+    if st.sidebar.button("Add to Crypto"):
+        if add_symbol and add_symbol.upper() not in st.session_state.crypto_watchlist:
+            st.session_state.crypto_watchlist.append(add_symbol.upper())
+            st.sidebar.success(f"Added {add_symbol.upper()} to Crypto")
+            
+    rem_symbol = st.sidebar.selectbox("Remove Symbol (/remove_crypto)", ["Select to remove"] + st.session_state.crypto_watchlist)
+    if st.sidebar.button("Remove from Crypto") and rem_symbol != "Select to remove":
+        st.session_state.crypto_watchlist.remove(rem_symbol)
+        st.sidebar.warning(f"Removed {rem_symbol}")
+        st.rerun()
+        
+    current_watchlist = st.session_state.crypto_watchlist
+    is_active_toggle = st.session_state.crypto_toggle
+
+elif selected_market.startswith("FOREX"):
+    st.sidebar.markdown("**💱 FOREX Watchlist Manager**")
+    st.session_state.forex_toggle = st.sidebar.toggle("Forex Alerts ON/OFF", value=st.session_state.forex_toggle)
+    
+    add_symbol = st.sidebar.text_input("Add Symbol (/add_forex)")
+    if st.sidebar.button("Add to Forex"):
+        if add_symbol and add_symbol.upper() not in st.session_state.forex_watchlist:
+            st.session_state.forex_watchlist.append(add_symbol.upper())
+            st.sidebar.success(f"Added {add_symbol.upper()} to Forex")
+            
+    rem_symbol = st.sidebar.selectbox("Remove Symbol (/remove_forex)", ["Select to remove"] + st.session_state.forex_watchlist)
+    if st.sidebar.button("Remove from Forex") and rem_symbol != "Select to remove":
+        st.session_state.forex_watchlist.remove(rem_symbol)
+        st.sidebar.warning(f"Removed {rem_symbol}")
+        st.rerun()
+        
+    current_watchlist = st.session_state.forex_watchlist
+    is_active_toggle = st.session_state.forex_toggle
+
+else:
+    st.sidebar.markdown("**🛢️ MCX Watchlist Manager**")
+    st.session_state.mcx_toggle = st.sidebar.toggle("MCX Alerts ON/OFF", value=st.session_state.mcx_toggle)
+    
+    add_symbol = st.sidebar.text_input("Add Symbol (/add_mcx)")
+    if st.sidebar.button("Add to MCX"):
+        if add_symbol and add_symbol.upper() not in st.session_state.mcx_watchlist:
+            st.session_state.mcx_watchlist.append(add_symbol.upper())
+            st.sidebar.success(f"Added {add_symbol.upper()} to MCX")
+            
+    rem_symbol = st.sidebar.selectbox("Remove Symbol (/remove_mcx)", ["Select to remove"] + st.session_state.mcx_watchlist)
+    if st.sidebar.button("Remove from MCX") and rem_symbol != "Select to remove":
+        st.session_state.mcx_watchlist.remove(rem_symbol)
+        st.sidebar.warning(f"Removed {rem_symbol}")
+        st.rerun()
+        
+    current_watchlist = st.session_state.mcx_watchlist
+    is_active_toggle = st.session_state.mcx_toggle
+
+st.sidebar.markdown("---")
 st.sidebar.markdown("### 🕒 Session & Killzone Toggle")
 killzone_toggle = st.sidebar.toggle("Active Session / Killzone (Visual)", value=True)
 
@@ -85,12 +184,18 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Scanner & Engine", "📸 Manual Screensho
 
 with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
-    col1, col2 = st.columns(2)
     
+    # Display Active Watchlist for selected category
+    st.info(f"📋 **Active Watchlist Symbols ({selected_market}):** {', '.join(current_watchlist)}")
+    
+    col1, col2 = st.columns(2)
     with col1:
-        asset_input = st.text_input("Target Asset / Symbol", value="NIFTY / CRUDEOIL / EURUSD / BTCUSDT")
+        asset_input = st.selectbox("Select Target Asset from Watchlist", current_watchlist)
     with col2:
         scan_mode = st.selectbox("Scan Mode", ["24/7 Autonomous Stream", "Instant Deep Scan"])
+
+    if not is_active_toggle:
+        st.warning(f"⚠️ **Alerts for {selected_market} are currently toggled OFF in sidebar!** Scanning in reference mode.")
 
     if st.button("Run Institutional Scan & Match Strategy"):
         with st.spinner("Analyzing Order Blocks, Liquidity Sweeps, and iFVG Confluences..."):
@@ -124,7 +229,7 @@ with tab1:
             t3 = entry_price + (risk_per_unit * 5)
             rr_ratio = "1 : 4.5"
 
-            if score >= 5:
+            if score >= 5 and is_active_toggle:
                 st.markdown(f"""
                 <div class="alert-box">
                 <h3>🎯 STRATEGY MATCHED: {matched_strat} (Rank 1 Setup)</h3>
@@ -162,8 +267,8 @@ with tab1:
             else:
                 st.markdown("""
                 <div class="no-trade-box">
-                <h3>⚠️ Strict No-Trade Filter Active</h3>
-                <p>Insufficient confluences detected. Market structure is in consolidation. Stand aside.</p>
+                <h3>⚠️ Strict No-Trade Filter Active (or Alerts Disabled)</h3>
+                <p>Insufficient confluences detected or category alerts toggled OFF. Market structure is in consolidation. Stand aside.</p>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -187,5 +292,6 @@ with tab3:
     st.progress(0.78, text="ICT 2022 Model (78% Win Rate)")
     st.progress(0.65, text="Silver Bullet Setup (65% Win Rate)")
     st.progress(0.70, text="Power of 3 (AMD) (70% Win Rate)")
+
 st.markdown("---")
 st.markdown("<p style='text-align: center; color: #787b86;'>Institutional ICT AI Trading Terminal | Mobile PWA Optimized</p>", unsafe_allow_html=True)
