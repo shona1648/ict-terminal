@@ -83,7 +83,7 @@ selected_market = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists & Toggles")
 
-# Category-wise Watchlist Manager with Clean Free Text Input & Inline Remove Selectbox
+# Strictly Isolated & Validated Category-wise Watchlist Managers
 if selected_market.startswith("NSE"):
     st.sidebar.markdown("**🟢 NSE Watchlist Manager**")
     st.session_state.nse_toggle = st.sidebar.toggle("NSE Alerts ON/OFF", value=st.session_state.nse_toggle, key="tgl_nse")
@@ -92,7 +92,12 @@ if selected_market.startswith("NSE"):
     if st.sidebar.button("Add to NSE", key="btn_nse"):
         if new_nse:
             sym = new_nse.strip().upper()
-            if sym not in st.session_state.nse_watchlist:
+            # Validation: Block common MCX/Crypto/Forex keywords if mistakenly added here
+            if any(k in sym for k in ["USDT", "CRUDE", "GOLD", "NATURAL", "EURUSD", "GBPUSD"]):
+                st.sidebar.error("❌ Invalid NSE symbol! This looks like Crypto/MCX/Forex.")
+            elif sym in st.session_state.nse_watchlist:
+                st.sidebar.warning("⚠️ Symbol already exists in NSE watchlist.")
+            else:
                 st.session_state.nse_watchlist.append(sym)
                 st.sidebar.success(f"Added {sym} to NSE!")
                 st.rerun()
@@ -114,7 +119,15 @@ elif selected_market.startswith("Crypto"):
     if st.sidebar.button("Add to Crypto", key="btn_crypto"):
         if new_crypto:
             sym = new_crypto.strip().upper()
-            if sym not in st.session_state.crypto_watchlist:
+            # STRICT VALIDATION: MCX commodities or NSE cash stocks cannot be added to Crypto
+            mcx_keywords = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS", "ZINC", "COPPER", "ALUMINIUM", "MENTHAOIL"]
+            if sym in mcx_keywords or "GAS" in sym or "CRUDE" in sym:
+                st.sidebar.error("❌ Rejected! MCX commodities (like Natural Gas / Crude) cannot be added to Crypto watchlist.")
+            elif sym in ["NIFTY", "BANKNIFTY", "RELIANCE"]:
+                st.sidebar.error("❌ Rejected! NSE stocks cannot be added to Crypto watchlist.")
+            elif sym in st.session_state.crypto_watchlist:
+                st.sidebar.warning("⚠️ Symbol already exists in Crypto watchlist.")
+            else:
                 st.session_state.crypto_watchlist.append(sym)
                 st.sidebar.success(f"Added {sym} to Crypto!")
                 st.rerun()
@@ -136,7 +149,11 @@ elif selected_market.startswith("FOREX"):
     if st.sidebar.button("Add to Forex", key="btn_forex"):
         if new_forex:
             sym = new_forex.strip().upper()
-            if sym not in st.session_state.forex_watchlist:
+            if any(k in sym for k in ["USDT", "CRUDE", "GOLD", "NIFTY"]):
+                st.sidebar.error("❌ Invalid Forex pair! Check symbol format.")
+            elif sym in st.session_state.forex_watchlist:
+                st.sidebar.warning("⚠️ Symbol already exists in Forex watchlist.")
+            else:
                 st.session_state.forex_watchlist.append(sym)
                 st.sidebar.success(f"Added {sym} to Forex!")
                 st.rerun()
@@ -158,7 +175,12 @@ else:
     if st.sidebar.button("Add to MCX", key="btn_mcx"):
         if new_mcx:
             sym = new_mcx.strip().upper()
-            if sym not in st.session_state.mcx_watchlist:
+            # STRICT VALIDATION: Crypto pairs or NSE stocks cannot be added to MCX
+            if "USDT" in sym or sym in ["BTC", "ETH", "SOL"]:
+                st.sidebar.error("❌ Rejected! Crypto assets cannot be added to MCX commodities watchlist.")
+            elif sym in st.session_state.mcx_watchlist:
+                st.sidebar.warning("⚠️ Symbol already exists in MCX watchlist.")
+            else:
                 st.session_state.mcx_watchlist.append(sym)
                 st.sidebar.success(f"Added {sym} to MCX!")
                 st.rerun()
