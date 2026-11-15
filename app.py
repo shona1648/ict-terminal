@@ -22,7 +22,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Session State for Watchlists & All Toggles Robustly
+# Initialize Session State for 4-Category Independent Watchlists & Toggles
 if 'nse_watchlist' not in st.session_state:
     st.session_state.nse_watchlist = ["NIFTY", "BANKNIFTY", "RELIANCE", "TATASTEEL"]
 if 'crypto_watchlist' not in st.session_state:
@@ -398,7 +398,7 @@ with tab2:
         if st.button("Run AI Vision Strategy Matching"):
             st.success("🎯 Strategy Identified: **ICT 2022 Model + Liquidity Sweep**. All 12+13 matrix filters validated successfully!")
 
-withtab3:
+with tab3:
     st.markdown("### 📊 Automated Performance Analytics (/stats)")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Win Rate", "68.4%", "+4.2%")
