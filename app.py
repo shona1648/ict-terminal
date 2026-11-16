@@ -32,7 +32,7 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# Initialize Toggles in session_state directly using keys
+# Bulletproof Session State Initialization for Toggles
 if 'chk_nse_alert' not in st.session_state: st.session_state.chk_nse_alert = True
 if 'chk_crypto_alert' not in st.session_state: st.session_state.chk_crypto_alert = True
 if 'chk_forex_alert' not in st.session_state: st.session_state.chk_forex_alert = True
@@ -141,11 +141,11 @@ selected_market = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🔔 Global Alert Controls (Master Switches)")
 
-# Bulletproof state management using Streamlit native key binding
-st.sidebar.checkbox("🟢 NSE Alerts Active", key="chk_nse_alert")
-st.sidebar.checkbox("🪙 Crypto Alerts Active", key="chk_crypto_alert")
-st.sidebar.checkbox("💱 Forex Alerts Active", key="chk_forex_alert")
-st.sidebar.checkbox("🛢️ MCX Alerts Active", key="chk_mcx_alert")
+# Independent Checkboxes using direct session state binding
+st.sidebar.checkbox("🟢 NSE Alerts Active", value=st.session_state.chk_nse_alert, key="chk_nse_alert")
+st.sidebar.checkbox("🪙 Crypto Alerts Active", value=st.session_state.chk_crypto_alert, key="chk_crypto_alert")
+st.sidebar.checkbox("💱 Forex Alerts Active", value=st.session_state.chk_forex_alert, key="chk_forex_alert")
+st.sidebar.checkbox("🛢️ MCX Alerts Active", value=st.session_state.chk_mcx_alert, key="chk_mcx_alert")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists")
@@ -275,7 +275,7 @@ with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
     
     # --- KILLZONE CHECKBOX ---
-    st.checkbox("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", key="chk_killzone_main")
+    st.checkbox("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", value=st.session_state.chk_killzone_main, key="chk_killzone_main")
     
     if st.session_state.chk_killzone_main:
         st.success("🟢 Killzone Active: High Probability Array Setup Enabled")
@@ -293,9 +293,15 @@ with tab1:
         if st.session_state.chk_forex_alert: available_scan_targets.append("FOREX Major Pairs")
         if st.session_state.chk_mcx_alert: available_scan_targets.append("MCX Commodities")
         
+        # Ensure selected scan target is valid against current toggles
+        current_sel_target = st.session_state.get("select_scan_target_cat", "All Markets (Global Scan)")
+        if current_sel_target not in available_scan_targets:
+            current_sel_target = "All Markets (Global Scan)"
+
         scan_target_category = st.selectbox(
             "🎯 Target Scan Category (Your Control)",
             available_scan_targets,
+            index=available_scan_targets.index(current_sel_target),
             key="select_scan_target_cat"
         )
     with col2:
