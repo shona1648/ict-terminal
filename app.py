@@ -39,41 +39,55 @@ if 'chk_forex_alert' not in st.session_state: st.session_state.chk_forex_alert =
 if 'chk_mcx_alert' not in st.session_state: st.session_state.chk_mcx_alert = True
 if 'chk_killzone_main' not in st.session_state: st.session_state.chk_killzone_main = True
 
-# --- PROFESSIONAL LIVE DATA FETCHING ENGINE ---
+# --- PROFESSIONAL LIVE DATA FETCHING ENGINE (Yahoo Finance for Crypto/Forex & Dhan for NSE/MCX) ---
 def get_live_price(symbol, market_type):
     sym = symbol.strip().upper()
     try:
-        if "-" in sym or sym.endswith("-USD"):
-            url = f"https://api.binance.com/api/v3/ticker/price?symbol={sym.replace('-', '')}"
-            res = requests.get(url, timeout=2).json()
-            return float(res.get("price", 1000.0))
-        elif len(sym) == 6 and sym.isalpha():
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}=X"
+        if "Crypto" in market_type:
+            # Crypto via Yahoo Finance (e.g. BTC-USD matching exact symbol)
+            test_sym = sym if sym.endswith("-USD") else sym + "-USD"
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
             headers = {'User-Agent': 'Mozilla/5.0'}
             res = requests.get(url, headers=headers, timeout=2).json()
             return float(res['chart']['result'][0]['meta']['regularMarketPrice'])
-        else:
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
-            if "NSE" in market_type and not sym.endswith(".NS") and sym not in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"]:
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}.NS"
-            elif "MCX" in market_type and not sym.endswith("=F"):
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}=F"
+            
+        elif "FOREX" in market_type:
+            # Forex Major Pairs via Yahoo Finance Currency endpoint (e.g. EURUSD=X)
+            if len(sym) == 6:
+                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}=X"
+                headers = {'User-Agent': 'Mozilla/5.0'}
+                res = requests.get(url, headers=headers, timeout=2).json()
+                return float(res['chart']['result'][0]['meta']['regularMarketPrice'])
                 
+        elif "NSE" in market_type:
+            # 🔌 DHAN API INTEGRATION POINT FOR NSE EQUITIES & INDICES
+            # Replace below fallback with your Dhan API / WebSocket live feed client
+            test_sym = sym if sym in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"] else (sym if sym.endswith(".NS") else sym + ".NS")
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
             headers = {'User-Agent': 'Mozilla/5.0'}
             res = requests.get(url, headers=headers, timeout=2).json()
-            price = res['chart']['result'][0]['meta']['regularMarketPrice']
-            return float(price)
+            return float(res['chart']['result'][0]['meta']['regularMarketPrice'])
+            
+        elif "MCX" in market_type:
+            # 🔌 DHAN COMMODITY API INTEGRATION POINT FOR MCX
+            # Replace below fallback with your Dhan API commodity feed
+            test_sym = sym if sym.endswith("=F") else sym + "=F"
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            res = requests.get(url, headers=headers, timeout=2).json()
+            return float(res['chart']['result'][0]['meta']['regularMarketPrice'])
     except:
         pass
     return 1000.00
 
-# --- STRICT ONLINE VALIDATION FUNCTIONS ---
+# --- STRICT ONLINE SYMBOL VALIDATION FUNCTIONS ---
 def verify_nse_symbol(symbol):
     sym = symbol.strip().upper()
     if sym in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"]:
         return True, sym
     test_sym = sym if sym.endswith(".NS") else sym + ".NS"
     try:
+        # TODO: Connect Dhan Symbol Master validation if needed
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
         headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(url, headers=headers, timeout=3).json()
@@ -85,16 +99,28 @@ def verify_nse_symbol(symbol):
 
 def verify_crypto_symbol(symbol):
     sym = symbol.strip().upper()
-    if not sym.endswith("-USD") and not sym.endswith("=F"):
-        sym = sym + "-USD"
+    test_sym = sym if sym.endswith("-USD") else sym + "-USD"
     try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
         headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(url, headers=headers, timeout=3).json()
         if res.get('chart') and res['chart'].get('result'):
-            return True, sym
+            return True, test_sym
     except:
         pass
+    return False, sym
+
+def verify_forex_symbol(symbol):
+    sym = symbol.strip().upper()
+    if len(sym) == 6 and sym.isalpha():
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}=X"
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            res = requests.get(url, headers=headers, timeout=3).json()
+            if res.get('chart') and res['chart'].get('result'):
+                return True, sym
+        except:
+            pass
     return False, sym
 
 def verify_mcx_symbol(symbol):
@@ -102,6 +128,7 @@ def verify_mcx_symbol(symbol):
     if sym == "CRUDE": sym = "CRUDEOIL"
     test_sym = sym if sym.endswith("=F") else sym + "=F"
     try:
+        # TODO: Connect Dhan Commodity Symbol validation if needed
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
         headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(url, headers=headers, timeout=3).json()
@@ -147,11 +174,11 @@ st.sidebar.checkbox("💱 Forex Alerts Active", key="chk_forex_alert")
 st.sidebar.checkbox("🛢️ MCX Alerts Active", key="chk_mcx_alert")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📂 Watchlist Single-Box Manager")
+st.sidebar.markdown("### 📂 Watchlist Manager Box")
 
-# Category-wise Unified Add & Single Dropdown Box Manager (Multiselect Box)
+# Category-wise Unified Add & Single Dropdown Box Manager (Selectbox + Remove Button)
 if selected_market.startswith("NSE"):
-    st.sidebar.markdown("**🟢 NSE Watchlist**")
+    st.sidebar.markdown("**🟢 NSE Watchlist (Dhan Account Feed)**")
     new_nse = st.sidebar.text_input("Add Symbol", key="input_nse_box", placeholder="e.g. RELIANCE, SBIN")
     if st.sidebar.button("➕ Add to Watchlist", key="btn_add_nse_symbol"):
         if new_nse:
@@ -166,23 +193,18 @@ if selected_market.startswith("NSE"):
             else:
                 st.sidebar.error(f"❌ Invalid NSE symbol!")
     
-    # Single Box containing all items with direct cross/remove feature
-    updated_nse = st.sidebar.multiselect(
-        "📋 Watchlist Box (Click box to view / tap 'x' to remove)", 
-        options=st.session_state.nse_watchlist, 
-        default=st.session_state.nse_watchlist, 
-        key="multi_nse_box"
-    )
-    if updated_nse != st.session_state.nse_watchlist:
-        if len(updated_nse) >= 1:
-            st.session_state.nse_watchlist = updated_nse
+    selected_nse_item = st.sidebar.selectbox("📋 Watchlist Box", st.session_state.nse_watchlist, key="sel_nse_box")
+    if st.sidebar.button("❌ Remove Selected Symbol", key="btn_rem_nse"):
+        if len(st.session_state.nse_watchlist) > 1:
+            st.session_state.nse_watchlist.remove(selected_nse_item)
+            st.sidebar.success(f"Removed {selected_nse_item}")
             st.rerun()
         else:
             st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
 elif selected_market.startswith("Crypto"):
-    st.sidebar.markdown("**🪙 Crypto Watchlist**")
-    new_crypto = st.sidebar.text_input("Add Symbol", key="input_crypto_box", placeholder="e.g. BTC or BTC-USD")
+    st.sidebar.markdown("**🪙 Crypto Watchlist (Yahoo Finance)**")
+    new_crypto = st.sidebar.text_input("Add Symbol", key="input_crypto_box", placeholder="e.g. BTC, ETH, SOL")
     if st.sidebar.button("➕ Add to Watchlist", key="btn_add_crypto_symbol"):
         if new_crypto:
             is_valid, verified_sym = verify_crypto_symbol(new_crypto)
@@ -196,49 +218,42 @@ elif selected_market.startswith("Crypto"):
             else:
                 st.sidebar.error(f"❌ Invalid Crypto ticker!")
                 
-    updated_crypto = st.sidebar.multiselect(
-        "📋 Watchlist Box (Click box to view / tap 'x' to remove)", 
-        options=st.session_state.crypto_watchlist, 
-        default=st.session_state.crypto_watchlist, 
-        key="multi_crypto_box"
-    )
-    if updated_crypto != st.session_state.crypto_watchlist:
-        if len(updated_crypto) >= 1:
-            st.session_state.crypto_watchlist = updated_crypto
+    selected_crypto_item = st.sidebar.selectbox("📋 Watchlist Box", st.session_state.crypto_watchlist, key="sel_crypto_box")
+    if st.sidebar.button("❌ Remove Selected Symbol", key="btn_rem_crypto"):
+        if len(st.session_state.crypto_watchlist) > 1:
+            st.session_state.crypto_watchlist.remove(selected_crypto_item)
+            st.sidebar.success(f"Removed {selected_crypto_item}")
             st.rerun()
         else:
             st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
 elif selected_market.startswith("FOREX"):
-    st.sidebar.markdown("**💱 FOREX Watchlist**")
+    st.sidebar.markdown("**💱 FOREX Watchlist (Yahoo Finance)**")
     new_forex = st.sidebar.text_input("Add Symbol", key="input_forex_box", placeholder="e.g. EURUSD")
     if st.sidebar.button("➕ Add to Watchlist", key="btn_add_forex_symbol"):
         if new_forex:
-            sym = new_forex.strip().upper()
-            if sym in st.session_state.forex_watchlist:
-                st.sidebar.warning(f"⚠️ '{sym}' already exists!")
-            elif len(sym) == 6 and sym.isalpha():
-                st.session_state.forex_watchlist.append(sym)
-                st.sidebar.success(f"✅ Added {sym}!")
-                st.rerun()
+            is_valid, verified_sym = verify_forex_symbol(new_forex)
+            if is_valid:
+                if verified_sym in st.session_state.forex_watchlist:
+                    st.sidebar.warning(f"⚠️ '{verified_sym}' already exists!")
+                else:
+                    st.session_state.forex_watchlist.append(verified_sym)
+                    st.sidebar.success(f"✅ Added {verified_sym}!")
+                    st.rerun()
             else:
-                st.sidebar.error("❌ Invalid Forex format (e.g. EURUSD)")
+                st.sidebar.error("❌ Invalid Forex pair (e.g. EURUSD)")
                 
-    updated_forex = st.sidebar.multiselect(
-        "📋 Watchlist Box (Click box to view / tap 'x' to remove)", 
-        options=st.session_state.forex_watchlist, 
-        default=st.session_state.forex_watchlist, 
-        key="multi_forex_box"
-    )
-    if updated_forex != st.session_state.forex_watchlist:
-        if len(updated_forex) >= 1:
-            st.session_state.forex_watchlist = updated_forex
+    selected_forex_item = st.sidebar.selectbox("📋 Watchlist Box", st.session_state.forex_watchlist, key="sel_forex_box")
+    if st.sidebar.button("❌ Remove Selected Symbol", key="btn_rem_forex"):
+        if len(st.session_state.forex_watchlist) > 1:
+            st.session_state.forex_watchlist.remove(selected_forex_item)
+            st.sidebar.success(f"Removed {selected_forex_item}")
             st.rerun()
         else:
             st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
 else:
-    st.sidebar.markdown("**🛢️ MCX Watchlist**")
+    st.sidebar.markdown("**🛢️ MCX Watchlist (Dhan Account Feed)**")
     new_mcx = st.sidebar.text_input("Add Symbol", key="input_mcx_box", placeholder="e.g. CRUDEOIL, GOLD")
     if st.sidebar.button("➕ Add to Watchlist", key="btn_add_mcx_symbol"):
         if new_mcx:
@@ -253,15 +268,11 @@ else:
             else:
                 st.sidebar.error(f"❌ Invalid MCX commodity!")
             
-    updated_mcx = st.sidebar.multiselect(
-        "📋 Watchlist Box (Click box to view / tap 'x' to remove)", 
-        options=st.session_state.mcx_watchlist, 
-        default=st.session_state.mcx_watchlist, 
-        key="multi_mcx_box"
-    )
-    if updated_mcx != st.session_state.mcx_watchlist:
-        if len(updated_mcx) >= 1:
-            st.session_state.mcx_watchlist = updated_mcx
+    selected_mcx_item = st.sidebar.selectbox("📋 Watchlist Box", st.session_state.mcx_watchlist, key="sel_mcx_box")
+    if st.sidebar.button("❌ Remove Selected Symbol", key="btn_rem_mcx"):
+        if len(st.session_state.mcx_watchlist) > 1:
+            st.session_state.mcx_watchlist.remove(selected_mcx_item)
+            st.sidebar.success(f"Removed {selected_mcx_item}")
             st.rerun()
         else:
             st.sidebar.warning("⚠️ Keep at least 1 symbol!")
