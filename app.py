@@ -149,7 +149,7 @@ st.sidebar.checkbox("🛢️ MCX Alerts Active", key="chk_mcx_alert")
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists")
 
-# Category-wise Watchlist Managers with Dedicated Scrollable Box
+# Category-wise Watchlist Managers with Clean Scrollable Container Box
 if selected_market.startswith("NSE"):
     st.sidebar.markdown("**🟢 NSE Watchlist (Dhan Powered)**")
     new_nse = st.sidebar.text_input("Add Symbol to NSE", key="input_nse_box", placeholder="e.g. RELIANCE, SBIN")
@@ -167,12 +167,11 @@ if selected_market.startswith("NSE"):
                 st.sidebar.error(f"❌ Invalid NSE symbol!")
     
     st.sidebar.markdown("**Current NSE Watchlist:**")
-    # Dedicated Scrollable Box Container for Watchlist Items
-    with st.sidebar.container(height=220):
+    with st.sidebar.container(border=True):
         for idx, sym in enumerate(list(st.session_state.nse_watchlist)):
-            c1, c2 = st.columns([3, 1])
-            c1.markdown(f"`{sym}`")
-            if c2.button("🗑️", key=f"del_nse_item_{idx}_{sym}"):
+            col_a, col_b = st.columns([3, 1])
+            col_a.markdown(f"🔸 **{sym}**")
+            if col_b.button("🗑️", key=f"del_nse_item_{idx}_{sym}"):
                 if len(st.session_state.nse_watchlist) > 1:
                     st.session_state.nse_watchlist.remove(sym)
                     st.rerun()
@@ -196,11 +195,11 @@ elif selected_market.startswith("Crypto"):
                 st.sidebar.error(f"❌ Invalid Crypto ticker!")
                 
     st.sidebar.markdown("**Current Crypto Watchlist:**")
-    with st.sidebar.container(height=220):
+    with st.sidebar.container(border=True):
         for idx, sym in enumerate(list(st.session_state.crypto_watchlist)):
-            c1, c2 = st.columns([3, 1])
-            c1.markdown(f"`{sym}`")
-            if c2.button("🗑️", key=f"del_crypto_item_{idx}_{sym}"):
+            col_a, col_b = st.columns([3, 1])
+            col_a.markdown(f"🔸 **{sym}**")
+            if col_b.button("🗑️", key=f"del_crypto_item_{idx}_{sym}"):
                 if len(st.session_state.crypto_watchlist) > 1:
                     st.session_state.crypto_watchlist.remove(sym)
                     st.rerun()
@@ -223,11 +222,11 @@ elif selected_market.startswith("FOREX"):
                 st.sidebar.error("❌ Invalid Forex format (e.g. EURUSD)")
                 
     st.sidebar.markdown("**Current Forex Watchlist:**")
-    with st.sidebar.container(height=220):
+    with st.sidebar.container(border=True):
         for idx, sym in enumerate(list(st.session_state.forex_watchlist)):
-            c1, c2 = st.columns([3, 1])
-            c1.markdown(f"`{sym}`")
-            if c2.button("🗑️", key=f"del_forex_item_{idx}_{sym}"):
+            col_a, col_b = st.columns([3, 1])
+            col_a.markdown(f"🔸 **{sym}**")
+            if col_b.button("🗑️", key=f"del_forex_item_{idx}_{sym}"):
                 if len(st.session_state.forex_watchlist) > 1:
                     st.session_state.forex_watchlist.remove(sym)
                     st.rerun()
@@ -251,11 +250,11 @@ else:
                 st.sidebar.error(f"❌ Invalid MCX commodity!")
             
     st.sidebar.markdown("**Current MCX Watchlist:**")
-    with st.sidebar.container(height=220):
+    with st.sidebar.container(border=True):
         for idx, sym in enumerate(list(st.session_state.mcx_watchlist)):
-            c1, c2 = st.columns([3, 1])
-            c1.markdown(f"`{sym}`")
-            if c2.button("🗑️", key=f"del_mcx_item_{idx}_{sym}"):
+            col_a, col_b = st.columns([3, 1])
+            col_a.markdown(f"🔸 **{sym}**")
+            if col_b.button("🗑️", key=f"del_mcx_item_{idx}_{sym}"):
                 if len(st.session_state.mcx_watchlist) > 1:
                     st.session_state.mcx_watchlist.remove(sym)
                     st.rerun()
