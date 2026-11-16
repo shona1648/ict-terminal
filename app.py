@@ -129,11 +129,11 @@ CONFIRMATION_FILTERS = [
     "Zero-Line Crossover", "Multi-Timeframe Sweep"
 ]
 
-# Sidebar Controls (With "All" option included)
+# Sidebar Controls (Reverted back to original 4 core categories without "All")
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 selected_market = st.sidebar.selectbox(
     "Select Market Category",
-    ["All", "NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
+    ["NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
 )
 
 st.sidebar.markdown("---")
@@ -148,12 +148,8 @@ st.session_state.mcx_toggle = st.sidebar.toggle("🛢️ MCX Alerts ON/OFF", val
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists")
 
-# Category-wise Watchlist Managers
-if selected_market == "All":
-    st.sidebar.markdown("**🌐 Global Master Watchlist (All Active)**")
-    st.sidebar.info("Viewing all markets combined. Choose a specific market above to edit its watchlist.")
-
-elif selected_market.startswith("NSE"):
+# Category-wise Watchlist Managers (4 Options)
+if selected_market.startswith("NSE"):
     st.sidebar.markdown("**🟢 NSE Watchlist (Dhan Powered)**")
     new_nse = st.sidebar.text_input("Add Symbol to NSE", key="input_nse_box", placeholder="e.g. RELIANCE, SBIN")
     if st.sidebar.button("Add to NSE", key="btn_nse"):
@@ -196,225 +192,4 @@ elif selected_market.startswith("Crypto"):
             else:
                 st.sidebar.error(f"❌ Invalid Crypto ticker!")
                 
-    st.sidebar.markdown("**Current Crypto Watchlist:**")
-    for sym in list(st.session_state.crypto_watchlist):
-        c1, c2 = st.sidebar.columns([3, 1])
-        c1.markdown(f"`{sym}`")
-        if c2.button("🗑️", key=f"del_crypto_{sym}"):
-            if len(st.session_state.crypto_watchlist) > 1:
-                st.session_state.crypto_watchlist.remove(sym)
-                st.rerun()
-            else:
-                st.sidebar.warning("⚠️ Keep at least 1 symbol!")
-
-elif selected_market.startswith("FOREX"):
-    st.sidebar.markdown("**💱 FOREX Watchlist**")
-    new_forex = st.sidebar.text_input("Add Symbol to Forex", key="input_forex_box", placeholder="e.g. EURUSD")
-    if st.sidebar.button("Add to Forex", key="btn_forex"):
-        if new_forex:
-            sym = new_forex.strip().upper()
-            if sym in st.session_state.forex_watchlist:
-                st.sidebar.warning(f"⚠️ '{sym}' already exists!")
-            elif len(sym) == 6 and sym.isalpha():
-                st.session_state.forex_watchlist.append(sym)
-                st.sidebar.success(f"✅ Added {sym}!")
-                st.rerun()
-            else:
-                st.sidebar.error("❌ Invalid Forex format (e.g. EURUSD)")
-                
-    st.sidebar.markdown("**Current Forex Watchlist:**")
-    for sym in list(st.session_state.forex_watchlist):
-        c1, c2 = st.sidebar.columns([3, 1])
-        c1.markdown(f"`{sym}`")
-        if c2.button("🗑️", key=f"del_forex_{sym}"):
-            if len(st.session_state.forex_watchlist) > 1:
-                st.session_state.forex_watchlist.remove(sym)
-                st.rerun()
-            else:
-                st.sidebar.warning("⚠️ Keep at least 1 symbol!")
-
-else:
-    st.sidebar.markdown("**🛢️ MCX Watchlist (Dhan Powered)**")
-    new_mcx = st.sidebar.text_input("Add Symbol to MCX", key="input_mcx_box", placeholder="e.g. CRUDEOIL, GOLD")
-    if st.sidebar.button("Add to MCX", key="btn_mcx"):
-        if new_mcx:
-            is_valid, verified_sym = verify_mcx_symbol(new_mcx)
-            if is_valid:
-                if verified_sym in st.session_state.mcx_watchlist:
-                    st.sidebar.warning(f"⚠️ '{verified_sym}' already exists!")
-                else:
-                    st.session_state.mcx_watchlist.append(verified_sym)
-                    st.sidebar.success(f"✅ Added {verified_sym}!")
-                    st.rerun()
-            else:
-                st.sidebar.error(f"❌ Invalid MCX commodity!")
-            
-    st.sidebar.markdown("**Current MCX Watchlist:**")
-    for sym in list(st.session_state.mcx_watchlist):
-        c1, c2 = st.sidebar.columns([3, 1])
-        c1.markdown(f"`{sym}`")
-        if c2.button("🗑️", key=f"del_mcx_{sym}"):
-            if len(st.session_state.mcx_watchlist) > 1:
-                st.session_state.mcx_watchlist.remove(sym)
-                st.rerun()
-            else:
-                st.sidebar.warning("⚠️ Keep at least 1 symbol!")
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🧮 Risk & Position Sizing")
-capital = st.sidebar.number_input("Trading Capital (₹ / $)", value=50000, step=5000)
-risk_pct = st.sidebar.slider("Risk Per Trade (%)", 0.5, 3.0, 1.0, 0.5)
-allowed_risk_amount = capital * (risk_pct / 100)
-st.sidebar.info(f"Allowed Risk Amount: ₹{allowed_risk_amount:,.2f}")
-
-# Main Dashboard Interface
-st.title("🏛️ Institutional ICT AI Trading Terminal")
-st.markdown("**Master Blueprint Terminal | Live Autonomous Surveillance & Price Action Engine**")
-
-tab1, tab2, tab3 = st.tabs(["🚀 Live Scanner & Engine", "📸 Manual Screenshot Analysis", "📊 Performance Stats (/stats)"])
-
-with tab1:
-    st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
-    
-    # --- KILLZONE TOGGLE PLACED DIRECTLY ON MAIN SCREEN (TAB 1) ---
-    st.session_state.killzone_toggle = st.toggle("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", value=st.session_state.killzone_toggle, key="main_screen_killzone")
-    if st.session_state.killzone_toggle:
-        st.success("🟢 Killzone Active: High Probability Array Setup Enabled")
-    else:
-        st.warning("⚪ Killzone Inactive: Reference Mode Only")
-    
-    st.markdown("---")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        target_category = st.selectbox(
-            "Select Market / Category for Scan",
-            ["All Markets", "NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
-        )
-    with col2:
-        scan_mode = st.selectbox("Scan Mode", ["24/7 Autonomous Stream", "Instant Deep Scan"])
-
-    if target_category == "All Markets":
-        all_assets = (
-            st.session_state.nse_watchlist + 
-            st.session_state.crypto_watchlist + 
-            st.session_state.forex_watchlist + 
-            st.session_state.mcx_watchlist
-        )
-        asset_input = random.choice(all_assets) if all_assets else "NIFTY"
-        current_toggle_status = (st.session_state.nse_toggle or st.session_state.crypto_toggle or st.session_state.forex_toggle or st.session_state.mcx_toggle)
-    elif target_category.startswith("NSE"):
-        asset_input = random.choice(st.session_state.nse_watchlist) if st.session_state.nse_watchlist else "NIFTY"
-        current_toggle_status = st.session_state.nse_toggle
-    elif target_category.startswith("Crypto"):
-        asset_input = random.choice(st.session_state.crypto_watchlist) if st.session_state.crypto_watchlist else "BTC-USD"
-        current_toggle_status = st.session_state.crypto_toggle
-    elif target_category.startswith("FOREX"):
-        asset_input = random.choice(st.session_state.forex_watchlist) if st.session_state.forex_watchlist else "EURUSD"
-        current_toggle_status = st.session_state.forex_toggle
-    else:
-        asset_input = random.choice(st.session_state.mcx_watchlist) if st.session_state.mcx_watchlist else "CRUDEOIL"
-        current_toggle_status = st.session_state.mcx_toggle
-
-    st.info(f"📋 **Scanning Category:** `{target_category}` | **Auto-Selected Asset:** `{asset_input}`")
-
-    if not current_toggle_status:
-        st.warning(f"⚠️ **Alerts for {target_category} are currently toggled OFF in sidebar!** Scanning in reference mode.")
-
-    current_live_price = get_live_price(asset_input, target_category)
-    st.caption(f"📡 **Live Market Feed ({asset_input}):** ₹ / $ {current_live_price:,.2f}")
-
-    if st.button("Run Institutional Scan & Match Strategy"):
-        with st.spinner(f"Scanning Order Blocks, Liquidity Sweeps, and iFVG Confluences for {asset_input}..."):
-            matched_strat = random.choice(STRATEGIES)
-            matched_confluences = random.sample(CONFIRMATION_FILTERS, k=random.randint(4, 7))
-            score = len(matched_confluences)
-            
-            entry_price = current_live_price
-            sl_price = entry_price * 0.992 if score % 2 == 0 else entry_price * 1.008
-            risk_per_unit = abs(entry_price - sl_price)
-            
-            if asset_input in st.session_state.nse_watchlist:
-                lot_size = 25
-                qty = max(1, int(allowed_risk_amount / (risk_per_unit * lot_size))) * lot_size
-                asset_label = f"NSE | {asset_input}"
-            elif asset_input in st.session_state.mcx_watchlist:
-                multiplier = 100
-                qty = max(1, int(allowed_risk_amount / (risk_per_unit * multiplier)))
-                asset_label = f"MCX | {asset_input}"
-            elif asset_input in st.session_state.forex_watchlist:
-                qty = round(allowed_risk_amount / (risk_per_unit * 10), 2)
-                asset_label = f"FOREX | {asset_input}"
-            else:
-                qty = round(allowed_risk_amount / risk_per_unit, 4)
-                asset_label = f"Crypto | {asset_input}"
-
-            t1 = entry_price + (risk_per_unit * 2)
-            t2 = entry_price + (risk_per_unit * 3.5)
-            t3 = entry_price + (risk_per_unit * 5)
-            rr_ratio = "1 : 4.5"
-
-            if score >= 5 and current_toggle_status:
-                st.markdown(f"""
-                <div class="alert-box">
-                <h3>🎯 STRATEGY MATCHED: {matched_strat} (Rank 1 Setup)</h3>
-                <p><b>Market Category & Asset:</b> {asset_label}</p>
-                <p><b>Active Session Status:</b> {'London Open / NY Killzone [ON]' if st.session_state.killzone_toggle else 'Manual Reference [OFF]'}</p>
-                <p><b>Confluences Found ({score}/13):</b> {', '.join(matched_confluences)}</p>
-                <p><b>Classification:</b> Intraday / Swing | High Probability Setup</p>
-                <hr style="border-color: #2a2e39;">
-                <h4>📊 Precision Trade Execution:</h4>
-                <ul>
-                    <li><b>Live Reference Price:</b> ₹ / $ {entry_price:,.2f}</li>
-                    <li><b>Stop Loss (SL):</b> ₹ / $ {sl_price:,.2f}</li>
-                    <li><b>Target 1 (T1):</b> ₹ / $ {t1:,.2f} | <b>Target 2 (T2):</b> ₹ / $ {t2:,.2f} | <b>Target 3 (T3):</b> ₹ / $ {t3:,.2f}</li>
-                    <li><b>Risk-to-Reward Ratio (RR):</b> {rr_ratio}</li>
-                </ul>
-                <h4>🧮 Position Sizing (Capital: ₹{capital:,.0f} | Risk: {risk_pct}%):</h4>
-                <ul>
-                    <li><b>Recommended Quantity / Lots:</b> <b>{qty}</b> (Round Number Optimized)</li>
-                </ul>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                b1, b2, b3 = st.columns(3)
-                with b1:
-                    if st.button("✅ Take Trade"):
-                        st.success("Trade logged successfully into Digital Journal!")
-                with b2:
-                    if st.button("📊 Log Result"):
-                        st.info("Result telemetry updated.")
-                with b3:
-                    if st.button("❌ Ignore"):
-                        st.warning("Setup discarded.")
-            else:
-                st.markdown("""
-                <div class="no-trade-box">
-                <h3>⚠️ Strict No-Trade Filter Active (or Alerts Disabled)</h3>
-                <p>Insufficient confluences detected or category alerts toggled OFF. Market structure is in consolidation. Stand aside.</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-with tab2:
-    st.markdown("### 📸 Manual Screenshot & Backtest AI Vision Analysis")
-    uploaded_file = st.file_uploader("Upload TradingView / Footprint Chart Screenshot", type=["png", "jpg", "jpeg"])
-    if uploaded_file is not None:
-        st.image(uploaded_file, caption="Uploaded Chart for ICT Confluence Analysis", use_column_width=True)
-        if st.button("Run AI Vision Strategy Matching"):
-            st.success("🎯 Strategy Identified: **ICT 2022 Model + Liquidity Sweep**. All 12+13 matrix filters validated successfully!")
-
-with tab3:
-    st.markdown("### 📊 Automated Performance Analytics (/stats)")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Win Rate", "68.4%", "+4.2%")
-    c2.metric("Total P&L", "₹42,850", "12.5R")
-    c3.metric("Profit Factor", "2.34", "Optimal")
-    c4.metric("Active Streak", "3 Wins", "🔥")
-    st.markdown("---")
-    st.markdown("**Strategy-wise Win Rate Breakdown:**")
-    st.progress(0.78, text="ICT 2022 Model (78% Win Rate)")
-    st.progress(0.65, text="Silver Bullet Setup (65% Win Rate)")
-    st.progress(0.70, text="Power of 3 (AMD) (70% Win Rate)")
-
-st.markdown("---")
-st.markdown("<p style='text-align: center; color: #787b86;'>Institutional ICT AI Trading Terminal | Mobile PWA Optimized</p>", unsafe_allow_html=True)
+    st.sidebar.markdown
