@@ -22,7 +22,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Session State Watchlists & Toggles Safely
+# Initialize Session State Watchlists Safely
 if 'nse_watchlist' not in st.session_state:
     st.session_state.nse_watchlist = ["NIFTY", "BANKNIFTY", "RELIANCE", "TATASTEEL"]
 if 'crypto_watchlist' not in st.session_state:
@@ -32,6 +32,7 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
+# Initialize Toggles in session state
 if 'top_tgl_nse' not in st.session_state: st.session_state.top_tgl_nse = True
 if 'top_tgl_crypto' not in st.session_state: st.session_state.top_tgl_crypto = True
 if 'top_tgl_forex' not in st.session_state: st.session_state.top_tgl_forex = True
@@ -139,11 +140,26 @@ selected_market = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🔔 Global Market Toggles")
 
-# --- CLEAN NATIVE STREAMLIT TOGGLES (No assignment conflicts) ---
-st.sidebar.toggle("🟢 NSE Alerts ON/OFF", key="top_tgl_nse")
-st.sidebar.toggle("🪙 Crypto Alerts ON/OFF", key="top_tgl_crypto")
-st.sidebar.toggle("💱 Forex Alerts ON/OFF", key="top_tgl_forex")
-st.sidebar.toggle("🛢️ MCX Alerts ON/OFF", key="top_tgl_mcx")
+# --- BULLETPROOF CALLBACK TOGGLES ---
+def toggle_nse_cb():
+    st.session_state.top_tgl_nse = st.session_state.widget_nse
+
+def toggle_crypto_cb():
+    st.session_state.top_tgl_crypto = st.session_state.widget_crypto
+
+def toggle_forex_cb():
+    st.session_state.top_tgl_forex = st.session_state.widget_forex
+
+def toggle_mcx_cb():
+    st.session_state.top_tgl_mcx = st.session_state.widget_mcx
+
+def toggle_kz_cb():
+    st.session_state.main_screen_killzone = st.session_state.widget_kz
+
+st.sidebar.toggle("🟢 NSE Alerts ON/OFF", value=st.session_state.top_tgl_nse, key="widget_nse", on_change=toggle_nse_cb)
+st.sidebar.toggle("🪙 Crypto Alerts ON/OFF", value=st.session_state.top_tgl_crypto, key="widget_crypto", on_change=toggle_crypto_cb)
+st.sidebar.toggle("💱 Forex Alerts ON/OFF", value=st.session_state.top_tgl_forex, key="widget_forex", on_change=toggle_forex_cb)
+st.sidebar.toggle("🛢️ MCX Alerts ON/OFF", value=st.session_state.top_tgl_mcx, key="widget_mcx", on_change=toggle_mcx_cb)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists")
@@ -273,7 +289,7 @@ with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
     
     # --- KILLZONE TOGGLE ---
-    st.toggle("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", key="main_screen_killzone")
+    st.toggle("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", value=st.session_state.main_screen_killzone, key="widget_kz", on_change=toggle_kz_cb)
     
     if st.session_state.main_screen_killzone:
         st.success("🟢 Killzone Active: High Probability Array Setup Enabled")
