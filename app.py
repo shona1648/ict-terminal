@@ -32,12 +32,28 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# Bulletproof Session State Initialization for Toggles
+# Initialize Toggles in session_state safely
 if 'chk_nse_alert' not in st.session_state: st.session_state.chk_nse_alert = True
 if 'chk_crypto_alert' not in st.session_state: st.session_state.chk_crypto_alert = True
 if 'chk_forex_alert' not in st.session_state: st.session_state.chk_forex_alert = True
 if 'chk_mcx_alert' not in st.session_state: st.session_state.chk_mcx_alert = True
 if 'chk_killzone_main' not in st.session_state: st.session_state.chk_killzone_main = True
+
+# --- CALLBACK FUNCTIONS FOR SMOOTH MOBILE TOGGLING ---
+def toggle_nse():
+    st.session_state.chk_nse_alert = not st.session_state.chk_nse_alert
+
+def toggle_crypto():
+    st.session_state.chk_crypto_alert = not st.session_state.chk_crypto_alert
+
+def toggle_forex():
+    st.session_state.chk_forex_alert = not st.session_state.chk_forex_alert
+
+def toggle_mcx():
+    st.session_state.chk_mcx_alert = not st.session_state.chk_mcx_alert
+
+def toggle_killzone():
+    st.session_state.chk_killzone_main = not st.session_state.chk_killzone_main
 
 # --- PROFESSIONAL LIVE DATA FETCHING ENGINE ---
 def get_live_price(symbol, market_type):
@@ -141,11 +157,11 @@ selected_market = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🔔 Global Alert Controls (Master Switches)")
 
-# Independent Checkboxes using direct session state binding
-st.sidebar.checkbox("🟢 NSE Alerts Active", value=st.session_state.chk_nse_alert, key="chk_nse_alert")
-st.sidebar.checkbox("🪙 Crypto Alerts Active", value=st.session_state.chk_crypto_alert, key="chk_crypto_alert")
-st.sidebar.checkbox("💱 Forex Alerts Active", value=st.session_state.chk_forex_alert, key="chk_forex_alert")
-st.sidebar.checkbox("🛢️ MCX Alerts Active", value=st.session_state.chk_mcx_alert, key="chk_mcx_alert")
+# Independent Checkboxes using Callbacks for Mobile Reliability
+st.sidebar.checkbox("🟢 NSE Alerts Active", value=st.session_state.chk_nse_alert, on_change=toggle_nse, key="chk_nse_box_ui")
+st.sidebar.checkbox("🪙 Crypto Alerts Active", value=st.session_state.chk_crypto_alert, on_change=toggle_crypto, key="chk_crypto_box_ui")
+st.sidebar.checkbox("💱 Forex Alerts Active", value=st.session_state.chk_forex_alert, on_change=toggle_forex, key="chk_forex_box_ui")
+st.sidebar.checkbox("🛢️ MCX Alerts Active", value=st.session_state.chk_mcx_alert, on_change=toggle_mcx, key="chk_mcx_box_ui")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists")
@@ -274,8 +290,8 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Scanner & Engine", "📸 Manual Screensho
 with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
     
-    # --- KILLZONE CHECKBOX ---
-    st.checkbox("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", value=st.session_state.chk_killzone_main, key="chk_killzone_main")
+    # --- KILLZONE CHECKBOX WITH CALLBACK ---
+    st.checkbox("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", value=st.session_state.chk_killzone_main, on_change=toggle_killzone, key="chk_killzone_box_ui")
     
     if st.session_state.chk_killzone_main:
         st.success("🟢 Killzone Active: High Probability Array Setup Enabled")
@@ -293,7 +309,6 @@ with tab1:
         if st.session_state.chk_forex_alert: available_scan_targets.append("FOREX Major Pairs")
         if st.session_state.chk_mcx_alert: available_scan_targets.append("MCX Commodities")
         
-        # Ensure selected scan target is valid against current toggles
         current_sel_target = st.session_state.get("select_scan_target_cat", "All Markets (Global Scan)")
         if current_sel_target not in available_scan_targets:
             current_sel_target = "All Markets (Global Scan)"
