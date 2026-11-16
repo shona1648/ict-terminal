@@ -132,14 +132,12 @@ CONFIRMATION_FILTERS = [
 # Sidebar Controls
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 selected_market = st.sidebar.selectbox(
-    "Select Market Category",
+    "Select Market Category (Watchlist Manager)",
     ["NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
 )
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 🔔 Global Market Toggles")
-
-# --- BULLETPROOF CHECKBOX TOGGLES (Mobile Safe) ---
+st.sidebar.markdown("### 🔔 Global Alert Controls (Master Switches)")
 st.session_state.top_tgl_nse = st.sidebar.checkbox("🟢 NSE Alerts Active", value=st.session_state.top_tgl_nse)
 st.session_state.top_tgl_crypto = st.sidebar.checkbox("🪙 Crypto Alerts Active", value=st.session_state.top_tgl_crypto)
 st.session_state.top_tgl_forex = st.sidebar.checkbox("💱 Forex Alerts Active", value=st.session_state.top_tgl_forex)
@@ -282,46 +280,67 @@ with tab1:
     
     st.markdown("---")
 
+    # --- ADVANCED SCAN CONTROLS (Full User Control over Scan Target) ---
     col1, col2 = st.columns(2)
     with col1:
-        target_category = st.selectbox(
-            "Select Market / Category for Scan",
-            ["All Markets", "NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
+        # Dynamic scan target options based on active alerts
+        available_scan_targets = ["All Markets (Global Scan)"]
+        if st.session_state.top_tgl_nse: available_scan_targets.append("NSE (Equity Cash & F&O)")
+        if st.session_state.top_tgl_crypto: available_scan_targets.append("Crypto Futures")
+        if st.session_state.top_tgl_forex: available_scan_targets.append("FOREX Major Pairs")
+        if st.session_state.top_tgl_mcx: available_scan_targets.append("MCX Commodities")
+        
+        scan_target_category = st.selectbox(
+            "🎯 Target Scan Category (Your Control)",
+            available_scan_targets
         )
     with col2:
         scan_mode = st.selectbox("Scan Mode", ["24/7 Autonomous Stream", "Instant Deep Scan"])
 
-    if target_category == "All Markets":
-        all_assets = (
-            st.session_state.nse_watchlist + 
-            st.session_state.crypto_watchlist + 
-            st.session_state.forex_watchlist + 
-            st.session_state.mcx_watchlist
-        )
-        asset_input = random.choice(all_assets) if all_assets else "NIFTY"
-        current_toggle_status = (st.session_state.top_tgl_nse or st.session_state.top_tgl_crypto or st.session_state.top_tgl_forex or st.session_state.top_tgl_mcx)
-    elif target_category.startswith("NSE"):
-        asset_input = random.choice(st.session_state.nse_watchlist) if st.session_state.nse_watchlist else "NIFTY"
+    # Build active asset pool according to user's scan selection and alert toggles
+    active_pool = []
+    if "All Markets" in scan_target_category:
+        if st.session_state.top_tgl_nse: active_pool.extend(st.session_state.nse_watchlist)
+        if st.session_state.top_tgl_crypto: active_pool.extend(st.session_state.crypto_watchlist)
+        if st.session_state.top_tgl_forex: active_pool.extend(st.session_state.forex_watchlist)
+        if st.session_state.top_tgl_mcx: active_pool.extend(st.session_state.mcx_watchlist)
+    elif "NSE" in scan_target_category:
+        active_pool = st.session_state.nse_watchlist if st.session_state.top_tgl_nse else []
+    elif "Crypto" in scan_target_category:
+        active_pool = st.session_state.crypto_watchlist if st.session_state.top_tgl_crypto else []
+    elif "FOREX" in scan_target_category:
+        active_pool = st.session_state.forex_watchlist if st.session_state.top_tgl_forex else []
+    elif "MCX" in scan_target_category:
+        active_pool = st.session_state.mcx_watchlist if st.session_state.top_tgl_mcx else []
+
+    if active_pool:
+        asset_input = random.choice(active_pool)
+    else:
+        asset_input = "NIFTY"
+
+    # Determine current category type for live price and validation
+    if asset_input in st.session_state.nse_watchlist:
+        current_cat_label = "NSE (Equity Cash & F&O)"
         current_toggle_status = st.session_state.top_tgl_nse
-    elif target_category.startswith("Crypto"):
-        asset_input = random.choice(st.session_state.crypto_watchlist) if st.session_state.crypto_watchlist else "BTC-USD"
+    elif asset_input in st.session_state.crypto_watchlist:
+        current_cat_label = "Crypto Futures"
         current_toggle_status = st.session_state.top_tgl_crypto
-    elif target_category.startswith("FOREX"):
-        asset_input = random.choice(st.session_state.forex_watchlist) if st.session_state.forex_watchlist else "EURUSD"
+    elif asset_input in st.session_state.forex_watchlist:
+        current_cat_label = "FOREX Major Pairs"
         current_toggle_status = st.session_state.top_tgl_forex
     else:
-        asset_input = random.choice(st.session_state.mcx_watchlist) if st.session_state.mcx_watchlist else "CRUDEOIL"
+        current_cat_label = "MCX Commodities"
         current_toggle_status = st.session_state.top_tgl_mcx
 
-    st.info(f"📋 **Scanning Category:** `{target_category}` | **Auto-Selected Asset:** `{asset_input}`")
+    st.info(f"📋 **Active Scan Target:** `{scan_target_category}` | **Randomly Picked Asset:** `{asset_input}`")
 
-    if not current_toggle_status:
-        st.warning(f"⚠️ **Alerts for {target_category} are currently toggled OFF in sidebar!** Scanning in reference mode.")
+    if not active_pool:
+        st.error("⚠️ **No markets selected or corresponding alerts are toggled OFF!** Please enable at least one alert in the sidebar or choose an active scan target.")
 
-    current_live_price = get_live_price(asset_input, target_category)
+    current_live_price = get_live_price(asset_input, current_cat_label)
     st.caption(f"📡 **Live Market Feed ({asset_input}):** ₹ / $ {current_live_price:,.2f}")
 
-    if st.button("Run Institutional Scan & Match Strategy"):
+    if st.button("Run Institutional Scan & Match Strategy") and active_pool:
         with st.spinner(f"Scanning Order Blocks, Liquidity Sweeps, and iFVG Confluences for {asset_input}..."):
             matched_strat = random.choice(STRATEGIES)
             matched_confluences = random.sample(CONFIRMATION_FILTERS, k=random.randint(4, 7))
