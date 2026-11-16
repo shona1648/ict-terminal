@@ -22,7 +22,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Session State Watchlists Safely
+# Initialize Session State Watchlists & Toggles Safely
 if 'nse_watchlist' not in st.session_state:
     st.session_state.nse_watchlist = ["NIFTY", "BANKNIFTY", "RELIANCE", "TATASTEEL"]
 if 'crypto_watchlist' not in st.session_state:
@@ -32,7 +32,6 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# Initialize Toggles cleanly in session state
 if 'top_tgl_nse' not in st.session_state: st.session_state.top_tgl_nse = True
 if 'top_tgl_crypto' not in st.session_state: st.session_state.top_tgl_crypto = True
 if 'top_tgl_forex' not in st.session_state: st.session_state.top_tgl_forex = True
@@ -140,11 +139,11 @@ selected_market = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🔔 Global Market Toggles")
 
-# --- PROPER SESSION STATE BOUND TOGGLES ---
-st.session_state.top_tgl_nse = st.sidebar.toggle("🟢 NSE Alerts ON/OFF", value=st.session_state.top_tgl_nse, key="tgl_nse")
-st.session_state.top_tgl_crypto = st.sidebar.toggle("🪙 Crypto Alerts ON/OFF", value=st.session_state.top_tgl_crypto, key="tgl_crypto")
-st.session_state.top_tgl_forex = st.sidebar.toggle("💱 Forex Alerts ON/OFF", value=st.session_state.top_tgl_forex, key="tgl_forex")
-st.session_state.top_tgl_mcx = st.sidebar.toggle("🛢️ MCX Alerts ON/OFF", value=st.session_state.top_tgl_mcx, key="tgl_mcx")
+# --- CLEAN NATIVE STREAMLIT TOGGLES (No assignment conflicts) ---
+st.sidebar.toggle("🟢 NSE Alerts ON/OFF", key="top_tgl_nse")
+st.sidebar.toggle("🪙 Crypto Alerts ON/OFF", key="top_tgl_crypto")
+st.sidebar.toggle("💱 Forex Alerts ON/OFF", key="top_tgl_forex")
+st.sidebar.toggle("🛢️ MCX Alerts ON/OFF", key="top_tgl_mcx")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists")
@@ -274,7 +273,7 @@ with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
     
     # --- KILLZONE TOGGLE ---
-    st.session_state.main_screen_killzone = st.toggle("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", value=st.session_state.main_screen_killzone, key="tgl_killzone")
+    st.toggle("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", key="main_screen_killzone")
     
     if st.session_state.main_screen_killzone:
         st.success("🟢 Killzone Active: High Probability Array Setup Enabled")
