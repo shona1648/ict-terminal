@@ -140,29 +140,11 @@ selected_market = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🔔 Global Market Toggles")
 
-# --- BULLETPROOF BUTTON-BASED TOGGLES (Zero State Conflict) ---
-c_t1, c_t2 = st.sidebar.columns(2)
-with c_t1:
-    if st.button("🟢 NSE ON" if not st.session_state.top_tgl_nse else "🔴 NSE OFF"):
-        st.session_state.top_tgl_nse = not st.session_state.top_tgl_nse
-        st.rerun()
-with c_t2:
-    if st.button("🪙 Crypto ON" if not st.session_state.top_tgl_crypto else "🪙 Crypto OFF"):
-        st.session_state.top_tgl_crypto = not st.session_state.top_tgl_crypto
-        st.rerun()
-
-c_t3, c_t4 = st.sidebar.columns(2)
-with c_t3:
-    if st.button("💱 Forex ON" if not st.session_state.top_tgl_forex else "💱 Forex OFF"):
-        st.session_state.top_tgl_forex = not st.session_state.top_tgl_forex
-        st.rerun()
-with c_t4:
-    if st.button("🛢️ MCX ON" if not st.session_state.top_tgl_mcx else "🛢️ MCX OFF"):
-        st.session_state.top_tgl_mcx = not st.session_state.top_tgl_mcx
-        st.rerun()
-
-# Display current status indicators clearly
-st.sidebar.caption(f"Status: NSE: {'🟢' if st.session_state.top_tgl_nse else '🔴'} | Crypto: {'🟢' if st.session_state.top_tgl_crypto else '🔴'} | Forex: {'🟢' if st.session_state.top_tgl_forex else '🔴'} | MCX: {'🟢' if st.session_state.top_tgl_mcx else '🔴'}")
+# --- PROPER SESSION STATE BOUND TOGGLES ---
+st.session_state.top_tgl_nse = st.sidebar.toggle("🟢 NSE Alerts ON/OFF", value=st.session_state.top_tgl_nse, key="tgl_nse")
+st.session_state.top_tgl_crypto = st.sidebar.toggle("🪙 Crypto Alerts ON/OFF", value=st.session_state.top_tgl_crypto, key="tgl_crypto")
+st.session_state.top_tgl_forex = st.sidebar.toggle("💱 Forex Alerts ON/OFF", value=st.session_state.top_tgl_forex, key="tgl_forex")
+st.session_state.top_tgl_mcx = st.sidebar.toggle("🛢️ MCX Alerts ON/OFF", value=st.session_state.top_tgl_mcx, key="tgl_mcx")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists")
@@ -291,11 +273,9 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Scanner & Engine", "📸 Manual Screensho
 with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
     
-    # --- KILLZONE BUTTON TOGGLE ---
-    if st.button("🕒 Toggle Killzone Mode (" + ("ACTIVE" if st.session_state.main_screen_killzone else "INACTIVE") + ")"):
-        st.session_state.main_screen_killzone = not st.session_state.main_screen_killzone
-        st.rerun()
-
+    # --- KILLZONE TOGGLE ---
+    st.session_state.main_screen_killzone = st.toggle("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", value=st.session_state.main_screen_killzone, key="tgl_killzone")
+    
     if st.session_state.main_screen_killzone:
         st.success("🟢 Killzone Active: High Probability Array Setup Enabled")
     else:
