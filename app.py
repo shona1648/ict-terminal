@@ -133,7 +133,7 @@ CONFIRMATION_FILTERS = [
 # Sidebar Controls
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 selected_market = st.sidebar.selectbox(
-    "Select Market Category (Watchlist Manager)",
+    "Select Market Category",
     ["NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"],
     key="select_market_category_box"
 )
@@ -147,13 +147,13 @@ st.sidebar.checkbox("💱 Forex Alerts Active", key="chk_forex_alert")
 st.sidebar.checkbox("🛢️ MCX Alerts Active", key="chk_mcx_alert")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📂 Independent Watchlists & Manager Box")
+st.sidebar.markdown("### 📂 Watchlist Manager Box")
 
-# Category-wise Watchlist Managers with Dropdown / Selectbox Container
+# Category-wise Unified Add & Single-Box Select/Delete Manager
 if selected_market.startswith("NSE"):
-    st.sidebar.markdown("**🟢 NSE Watchlist**")
-    new_nse = st.sidebar.text_input("Add Symbol to NSE", key="input_nse_box", placeholder="e.g. RELIANCE, SBIN")
-    if st.sidebar.button("Add to NSE", key="btn_add_nse_symbol"):
+    st.sidebar.markdown("**🟢 NSE Watchlist Manager**")
+    new_nse = st.sidebar.text_input("Add New Symbol", key="input_nse_box", placeholder="e.g. RELIANCE, SBIN")
+    if st.sidebar.button("➕ Add to NSE Watchlist", key="btn_add_nse_symbol"):
         if new_nse:
             is_valid, verified_sym = verify_nse_symbol(new_nse)
             if is_valid:
@@ -166,20 +166,19 @@ if selected_market.startswith("NSE"):
             else:
                 st.sidebar.error(f"❌ Invalid NSE symbol!")
     
-    st.sidebar.markdown("**Manage Watchlist Box:**")
-    selected_nse_item = st.sidebar.selectbox("Current NSE Symbols", st.session_state.nse_watchlist, key="sel_nse_box")
+    selected_nse_item = st.sidebar.selectbox("📋 Watchlist Box (Select to Remove)", st.session_state.nse_watchlist, key="sel_nse_box")
     if st.sidebar.button("🗑️ Remove Selected Symbol", key="btn_rem_nse"):
         if len(st.session_state.nse_watchlist) > 1:
             st.session_state.nse_watchlist.remove(selected_nse_item)
             st.sidebar.success(f"Removed {selected_nse_item}")
             st.rerun()
         else:
-            st.sidebar.warning("⚠️ Keep at least 1 symbol!")
+            st.sidebar.warning("⚠️ Keep at least 1 symbol in watchlist!")
 
 elif selected_market.startswith("Crypto"):
-    st.sidebar.markdown("**🪙 Crypto Watchlist**")
-    new_crypto = st.sidebar.text_input("Add Symbol to Crypto", key="input_crypto_box", placeholder="e.g. BTC or BTC-USD")
-    if st.sidebar.button("Add to Crypto", key="btn_add_crypto_symbol"):
+    st.sidebar.markdown("**🪙 Crypto Watchlist Manager**")
+    new_crypto = st.sidebar.text_input("Add New Symbol", key="input_crypto_box", placeholder="e.g. BTC or BTC-USD")
+    if st.sidebar.button("➕ Add to Crypto Watchlist", key="btn_add_crypto_symbol"):
         if new_crypto:
             is_valid, verified_sym = verify_crypto_symbol(new_crypto)
             if is_valid:
@@ -192,20 +191,19 @@ elif selected_market.startswith("Crypto"):
             else:
                 st.sidebar.error(f"❌ Invalid Crypto ticker!")
                 
-    st.sidebar.markdown("**Manage Watchlist Box:**")
-    selected_crypto_item = st.sidebar.selectbox("Current Crypto Symbols", st.session_state.crypto_watchlist, key="sel_crypto_box")
+    selected_crypto_item = st.sidebar.selectbox("📋 Watchlist Box (Select to Remove)", st.session_state.crypto_watchlist, key="sel_crypto_box")
     if st.sidebar.button("🗑️ Remove Selected Symbol", key="btn_rem_crypto"):
         if len(st.session_state.crypto_watchlist) > 1:
             st.session_state.crypto_watchlist.remove(selected_crypto_item)
             st.sidebar.success(f"Removed {selected_crypto_item}")
             st.rerun()
         else:
-            st.sidebar.warning("⚠️ Keep at least 1 symbol!")
+            st.sidebar.warning("⚠️ Keep at least 1 symbol in watchlist!")
 
 elif selected_market.startswith("FOREX"):
-    st.sidebar.markdown("**💱 FOREX Watchlist**")
-    new_forex = st.sidebar.text_input("Add Symbol to Forex", key="input_forex_box", placeholder="e.g. EURUSD")
-    if st.sidebar.button("Add to Forex", key="btn_add_forex_symbol"):
+    st.sidebar.markdown("**💱 FOREX Watchlist Manager**")
+    new_forex = st.sidebar.text_input("Add New Symbol", key="input_forex_box", placeholder="e.g. EURUSD")
+    if st.sidebar.button("➕ Add to Forex Watchlist", key="btn_add_forex_symbol"):
         if new_forex:
             sym = new_forex.strip().upper()
             if sym in st.session_state.forex_watchlist:
@@ -217,20 +215,19 @@ elif selected_market.startswith("FOREX"):
             else:
                 st.sidebar.error("❌ Invalid Forex format (e.g. EURUSD)")
                 
-    st.sidebar.markdown("**Manage Watchlist Box:**")
-    selected_forex_item = st.sidebar.selectbox("Current Forex Symbols", st.session_state.forex_watchlist, key="sel_forex_box")
+    selected_forex_item = st.sidebar.selectbox("📋 Watchlist Box (Select to Remove)", st.session_state.forex_watchlist, key="sel_forex_box")
     if st.sidebar.button("🗑️ Remove Selected Symbol", key="btn_rem_forex"):
         if len(st.session_state.forex_watchlist) > 1:
             st.session_state.forex_watchlist.remove(selected_forex_item)
             st.sidebar.success(f"Removed {selected_forex_item}")
             st.rerun()
         else:
-            st.sidebar.warning("⚠️ Keep at least 1 symbol!")
+            st.sidebar.warning("⚠️ Keep at least 1 symbol in watchlist!")
 
 else:
-    st.sidebar.markdown("**🛢️ MCX Watchlist**")
-    new_mcx = st.sidebar.text_input("Add Symbol to MCX", key="input_mcx_box", placeholder="e.g. CRUDEOIL, GOLD")
-    if st.sidebar.button("Add to MCX", key="btn_add_mcx_symbol"):
+    st.sidebar.markdown("**🛢️ MCX Watchlist Manager**")
+    new_mcx = st.sidebar.text_input("Add New Symbol", key="input_mcx_box", placeholder="e.g. CRUDEOIL, GOLD")
+    if st.sidebar.button("➕ Add to MCX Watchlist", key="btn_add_mcx_symbol"):
         if new_mcx:
             is_valid, verified_sym = verify_mcx_symbol(new_mcx)
             if is_valid:
@@ -243,15 +240,14 @@ else:
             else:
                 st.sidebar.error(f"❌ Invalid MCX commodity!")
             
-    st.sidebar.markdown("**Manage Watchlist Box:**")
-    selected_mcx_item = st.sidebar.selectbox("Current MCX Symbols", st.session_state.mcx_watchlist, key="sel_mcx_box")
+    selected_mcx_item = st.sidebar.selectbox("📋 Watchlist Box (Select to Remove)", st.session_state.mcx_watchlist, key="sel_mcx_box")
     if st.sidebar.button("🗑️ Remove Selected Symbol", key="btn_rem_mcx"):
         if len(st.session_state.mcx_watchlist) > 1:
             st.session_state.mcx_watchlist.remove(selected_mcx_item)
             st.sidebar.success(f"Removed {selected_mcx_item}")
             st.rerun()
         else:
-            st.sidebar.warning("⚠️ Keep at least 1 symbol!")
+            st.sidebar.warning("⚠️ Keep at least 1 symbol in watchlist!")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🧮 Risk & Position Sizing")
