@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for Mobile Optimization & Institutional Styling
+# Custom CSS for Mobile Optimization, Watchlist Box & Institutional Styling
 st.markdown("""
     <style>
     .main { background-color: #0e1117; color: #ffffff; }
@@ -141,7 +141,6 @@ selected_market = st.sidebar.selectbox(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🔔 Global Alert Controls (Master Switches)")
 
-# Pure Native Streamlit Key Binding (No value parameter = No sync conflict!)
 st.sidebar.checkbox("🟢 NSE Alerts Active", key="chk_nse_alert")
 st.sidebar.checkbox("🪙 Crypto Alerts Active", key="chk_crypto_alert")
 st.sidebar.checkbox("💱 Forex Alerts Active", key="chk_forex_alert")
@@ -150,7 +149,7 @@ st.sidebar.checkbox("🛢️ MCX Alerts Active", key="chk_mcx_alert")
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists")
 
-# Category-wise Watchlist Managers (Completely Independent Block)
+# Category-wise Watchlist Managers with Dedicated Scrollable Box
 if selected_market.startswith("NSE"):
     st.sidebar.markdown("**🟢 NSE Watchlist (Dhan Powered)**")
     new_nse = st.sidebar.text_input("Add Symbol to NSE", key="input_nse_box", placeholder="e.g. RELIANCE, SBIN")
@@ -168,15 +167,17 @@ if selected_market.startswith("NSE"):
                 st.sidebar.error(f"❌ Invalid NSE symbol!")
     
     st.sidebar.markdown("**Current NSE Watchlist:**")
-    for idx, sym in enumerate(list(st.session_state.nse_watchlist)):
-        c1, c2 = st.sidebar.columns([3, 1])
-        c1.markdown(f"`{sym}`")
-        if c2.button("🗑️", key=f"del_nse_item_{idx}_{sym}"):
-            if len(st.session_state.nse_watchlist) > 1:
-                st.session_state.nse_watchlist.remove(sym)
-                st.rerun()
-            else:
-                st.sidebar.warning("⚠️ Keep at least 1 symbol!")
+    # Dedicated Scrollable Box Container for Watchlist Items
+    with st.sidebar.container(height=220):
+        for idx, sym in enumerate(list(st.session_state.nse_watchlist)):
+            c1, c2 = st.columns([3, 1])
+            c1.markdown(f"`{sym}`")
+            if c2.button("🗑️", key=f"del_nse_item_{idx}_{sym}"):
+                if len(st.session_state.nse_watchlist) > 1:
+                    st.session_state.nse_watchlist.remove(sym)
+                    st.rerun()
+                else:
+                    st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
 elif selected_market.startswith("Crypto"):
     st.sidebar.markdown("**🪙 Crypto Watchlist**")
@@ -195,15 +196,16 @@ elif selected_market.startswith("Crypto"):
                 st.sidebar.error(f"❌ Invalid Crypto ticker!")
                 
     st.sidebar.markdown("**Current Crypto Watchlist:**")
-    for idx, sym in enumerate(list(st.session_state.crypto_watchlist)):
-        c1, c2 = st.sidebar.columns([3, 1])
-        c1.markdown(f"`{sym}`")
-        if c2.button("🗑️", key=f"del_crypto_item_{idx}_{sym}"):
-            if len(st.session_state.crypto_watchlist) > 1:
-                st.session_state.crypto_watchlist.remove(sym)
-                st.rerun()
-            else:
-                st.sidebar.warning("⚠️ Keep at least 1 symbol!")
+    with st.sidebar.container(height=220):
+        for idx, sym in enumerate(list(st.session_state.crypto_watchlist)):
+            c1, c2 = st.columns([3, 1])
+            c1.markdown(f"`{sym}`")
+            if c2.button("🗑️", key=f"del_crypto_item_{idx}_{sym}"):
+                if len(st.session_state.crypto_watchlist) > 1:
+                    st.session_state.crypto_watchlist.remove(sym)
+                    st.rerun()
+                else:
+                    st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
 elif selected_market.startswith("FOREX"):
     st.sidebar.markdown("**💱 FOREX Watchlist**")
@@ -221,15 +223,16 @@ elif selected_market.startswith("FOREX"):
                 st.sidebar.error("❌ Invalid Forex format (e.g. EURUSD)")
                 
     st.sidebar.markdown("**Current Forex Watchlist:**")
-    for idx, sym in enumerate(list(st.session_state.forex_watchlist)):
-        c1, c2 = st.sidebar.columns([3, 1])
-        c1.markdown(f"`{sym}`")
-        if c2.button("🗑️", key=f"del_forex_item_{idx}_{sym}"):
-            if len(st.session_state.forex_watchlist) > 1:
-                st.session_state.forex_watchlist.remove(sym)
-                st.rerun()
-            else:
-                st.sidebar.warning("⚠️ Keep at least 1 symbol!")
+    with st.sidebar.container(height=220):
+        for idx, sym in enumerate(list(st.session_state.forex_watchlist)):
+            c1, c2 = st.columns([3, 1])
+            c1.markdown(f"`{sym}`")
+            if c2.button("🗑️", key=f"del_forex_item_{idx}_{sym}"):
+                if len(st.session_state.forex_watchlist) > 1:
+                    st.session_state.forex_watchlist.remove(sym)
+                    st.rerun()
+                else:
+                    st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
 else:
     st.sidebar.markdown("**🛢️ MCX Watchlist (Dhan Powered)**")
@@ -248,15 +251,16 @@ else:
                 st.sidebar.error(f"❌ Invalid MCX commodity!")
             
     st.sidebar.markdown("**Current MCX Watchlist:**")
-    for idx, sym in enumerate(list(st.session_state.mcx_watchlist)):
-        c1, c2 = st.sidebar.columns([3, 1])
-        c1.markdown(f"`{sym}`")
-        if c2.button("🗑️", key=f"del_mcx_item_{idx}_{sym}"):
-            if len(st.session_state.mcx_watchlist) > 1:
-                st.session_state.mcx_watchlist.remove(sym)
-                st.rerun()
-            else:
-                st.sidebar.warning("⚠️ Keep at least 1 symbol!")
+    with st.sidebar.container(height=220):
+        for idx, sym in enumerate(list(st.session_state.mcx_watchlist)):
+            c1, c2 = st.columns([3, 1])
+            c1.markdown(f"`{sym}`")
+            if c2.button("🗑️", key=f"del_mcx_item_{idx}_{sym}"):
+                if len(st.session_state.mcx_watchlist) > 1:
+                    st.session_state.mcx_watchlist.remove(sym)
+                    st.rerun()
+                else:
+                    st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🧮 Risk & Position Sizing")
@@ -274,7 +278,7 @@ tab1, tab2, tab3 = st.tabs(["🚀 Live Scanner & Engine", "📸 Manual Screensho
 with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
     
-    # --- KILLZONE CHECKBOX (Pure Key Binding) ---
+    # --- KILLZONE CHECKBOX ---
     st.checkbox("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", key="chk_killzone_main")
     
     if st.session_state.chk_killzone_main:
