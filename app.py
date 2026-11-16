@@ -32,11 +32,12 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-if 'top_tgl_nse' not in st.session_state: st.session_state.top_tgl_nse = True
-if 'top_tgl_crypto' not in st.session_state: st.session_state.top_tgl_crypto = True
-if 'top_tgl_forex' not in st.session_state: st.session_state.top_tgl_forex = True
-if 'top_tgl_mcx' not in st.session_state: st.session_state.top_tgl_mcx = True
-if 'main_screen_killzone' not in st.session_state: st.session_state.main_screen_killzone = True
+# Initialize Toggles in session_state directly using keys
+if 'chk_nse_alert' not in st.session_state: st.session_state.chk_nse_alert = True
+if 'chk_crypto_alert' not in st.session_state: st.session_state.chk_crypto_alert = True
+if 'chk_forex_alert' not in st.session_state: st.session_state.chk_forex_alert = True
+if 'chk_mcx_alert' not in st.session_state: st.session_state.chk_mcx_alert = True
+if 'chk_killzone_main' not in st.session_state: st.session_state.chk_killzone_main = True
 
 # --- PROFESSIONAL LIVE DATA FETCHING ENGINE ---
 def get_live_price(symbol, market_type):
@@ -139,10 +140,12 @@ selected_market = st.sidebar.selectbox(
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🔔 Global Alert Controls (Master Switches)")
-st.session_state.top_tgl_nse = st.sidebar.checkbox("🟢 NSE Alerts Active", value=st.session_state.top_tgl_nse, key="chk_nse_alert")
-st.session_state.top_tgl_crypto = st.sidebar.checkbox("🪙 Crypto Alerts Active", value=st.session_state.top_tgl_crypto, key="chk_crypto_alert")
-st.session_state.top_tgl_forex = st.sidebar.checkbox("💱 Forex Alerts Active", value=st.session_state.top_tgl_forex, key="chk_forex_alert")
-st.session_state.top_tgl_mcx = st.sidebar.checkbox("🛢️ MCX Alerts Active", value=st.session_state.top_tgl_mcx, key="chk_mcx_alert")
+
+# Bulletproof state management using Streamlit native key binding
+st.sidebar.checkbox("🟢 NSE Alerts Active", key="chk_nse_alert")
+st.sidebar.checkbox("🪙 Crypto Alerts Active", key="chk_crypto_alert")
+st.sidebar.checkbox("💱 Forex Alerts Active", key="chk_forex_alert")
+st.sidebar.checkbox("🛢️ MCX Alerts Active", key="chk_mcx_alert")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Independent Watchlists")
@@ -272,9 +275,9 @@ with tab1:
     st.markdown("### 🔍 Autonomous Multi-Market Surveillance")
     
     # --- KILLZONE CHECKBOX ---
-    st.session_state.main_screen_killzone = st.checkbox("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", value=st.session_state.main_screen_killzone, key="chk_killzone_main")
+    st.checkbox("🕒 Active Session / Killzone Mode (Visual High-Probability Filter)", key="chk_killzone_main")
     
-    if st.session_state.main_screen_killzone:
+    if st.session_state.chk_killzone_main:
         st.success("🟢 Killzone Active: High Probability Array Setup Enabled")
     else:
         st.warning("⚪ Killzone Inactive: Reference Mode Only")
@@ -285,10 +288,10 @@ with tab1:
     col1, col2 = st.columns(2)
     with col1:
         available_scan_targets = ["All Markets (Global Scan)"]
-        if st.session_state.top_tgl_nse: available_scan_targets.append("NSE (Equity Cash & F&O)")
-        if st.session_state.top_tgl_crypto: available_scan_targets.append("Crypto Futures")
-        if st.session_state.top_tgl_forex: available_scan_targets.append("FOREX Major Pairs")
-        if st.session_state.top_tgl_mcx: available_scan_targets.append("MCX Commodities")
+        if st.session_state.chk_nse_alert: available_scan_targets.append("NSE (Equity Cash & F&O)")
+        if st.session_state.chk_crypto_alert: available_scan_targets.append("Crypto Futures")
+        if st.session_state.chk_forex_alert: available_scan_targets.append("FOREX Major Pairs")
+        if st.session_state.chk_mcx_alert: available_scan_targets.append("MCX Commodities")
         
         scan_target_category = st.selectbox(
             "🎯 Target Scan Category (Your Control)",
@@ -298,21 +301,21 @@ with tab1:
     with col2:
         scan_mode = st.selectbox("Scan Mode", ["24/7 Autonomous Stream", "Instant Deep Scan"], key="select_scan_mode_type")
 
-    # Build active asset pool independently
+    # Build active asset pool independently based on session states
     active_pool = []
     if "All Markets" in scan_target_category:
-        if st.session_state.top_tgl_nse: active_pool.extend(st.session_state.nse_watchlist)
-        if st.session_state.top_tgl_crypto: active_pool.extend(st.session_state.crypto_watchlist)
-        if st.session_state.top_tgl_forex: active_pool.extend(st.session_state.forex_watchlist)
-        if st.session_state.top_tgl_mcx: active_pool.extend(st.session_state.mcx_watchlist)
+        if st.session_state.chk_nse_alert: active_pool.extend(st.session_state.nse_watchlist)
+        if st.session_state.chk_crypto_alert: active_pool.extend(st.session_state.crypto_watchlist)
+        if st.session_state.chk_forex_alert: active_pool.extend(st.session_state.forex_watchlist)
+        if st.session_state.chk_mcx_alert: active_pool.extend(st.session_state.mcx_watchlist)
     elif "NSE" in scan_target_category:
-        active_pool = st.session_state.nse_watchlist if st.session_state.top_tgl_nse else []
+        active_pool = st.session_state.nse_watchlist if st.session_state.chk_nse_alert else []
     elif "Crypto" in scan_target_category:
-        active_pool = st.session_state.crypto_watchlist if st.session_state.top_tgl_crypto else []
+        active_pool = st.session_state.crypto_watchlist if st.session_state.chk_crypto_alert else []
     elif "FOREX" in scan_target_category:
-        active_pool = st.session_state.forex_watchlist if st.session_state.top_tgl_forex else []
+        active_pool = st.session_state.forex_watchlist if st.session_state.chk_forex_alert else []
     elif "MCX" in scan_target_category:
-        active_pool = st.session_state.mcx_watchlist if st.session_state.top_tgl_mcx else []
+        active_pool = st.session_state.mcx_watchlist if st.session_state.chk_mcx_alert else []
 
     if active_pool:
         asset_input = random.choice(active_pool)
@@ -321,16 +324,16 @@ with tab1:
 
     if asset_input in st.session_state.nse_watchlist:
         current_cat_label = "NSE (Equity Cash & F&O)"
-        current_toggle_status = st.session_state.top_tgl_nse
+        current_toggle_status = st.session_state.chk_nse_alert
     elif asset_input in st.session_state.crypto_watchlist:
         current_cat_label = "Crypto Futures"
-        current_toggle_status = st.session_state.top_tgl_crypto
+        current_toggle_status = st.session_state.chk_crypto_alert
     elif asset_input in st.session_state.forex_watchlist:
         current_cat_label = "FOREX Major Pairs"
-        current_toggle_status = st.session_state.top_tgl_forex
+        current_toggle_status = st.session_state.chk_forex_alert
     else:
         current_cat_label = "MCX Commodities"
-        current_toggle_status = st.session_state.top_tgl_mcx
+        current_toggle_status = st.session_state.chk_mcx_alert
 
     st.info(f"📋 **Active Scan Target:** `{scan_target_category}` | **Randomly Picked Asset:** `{asset_input}`")
 
@@ -376,14 +379,14 @@ with tab1:
                     <div class="alert-box">
                     <h3>🎯 STRATEGY MATCHED: {matched_strat} (Rank 1 Setup)</h3>
                     <p><b>Market Category & Asset:</b> {asset_label}</p>
-                    <p><b>Active Session Status:</b> {'London Open / NY Killzone [ON]' if st.session_state.main_screen_killzone else 'Manual Reference [OFF]'}</p>
+                    <p><b>Active Session Status:</b> {'London Open / NY Killzone [ON]' if st.session_state.chk_killzone_main else 'Manual Reference [OFF]'}</p>
                     <p><b>Confluences Found ({score}/13):</b> {', '.join(matched_confluences)}</p>
                     <p><b>Classification:</b> Intraday / Swing | High Probability Setup</p>
                     <hr style="border-color: #2a2e39;">
                     <h4>📊 Precision Trade Execution:</h4>
                     <ul>
                         <li><b>Live Reference Price:</b> ₹ / $ {entry_price:,.2f}</li>
-                        <li><b>Stop Loss (SL):</b> ₹ / $ {sl_point if 'sl_point' in locals() else sl_price:,.2f}</li>
+                        <li><b>Stop Loss (SL):</b> ₹ / $ {sl_price:,.2f}</li>
                         <li><b>Target 1 (T1):</b> ₹ / $ {t1:,.2f} | <b>Target 2 (T2):</b> ₹ / $ {t2:,.2f} | <b>Target 3 (T3):</b> ₹ / $ {t3:,.2f}</li>
                         <li><b>Risk-to-Reward Ratio (RR):</b> {rr_ratio}</li>
                     </ul>
