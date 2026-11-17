@@ -32,12 +32,6 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# Initialize Telegram Alert Master Switches safely in session_state
-if 'chk_nse_alert' not in st.session_state: st.session_state.chk_nse_alert = True
-if 'chk_crypto_alert' not in st.session_state: st.session_state.chk_crypto_alert = True
-if 'chk_forex_alert' not in st.session_state: st.session_state.chk_forex_alert = True
-if 'chk_mcx_alert' not in st.session_state: st.session_state.chk_mcx_alert = True
-
 if 'current_scanned_asset' not in st.session_state:
     st.session_state.current_scanned_asset = "NIFTY"
 
@@ -153,20 +147,7 @@ CONFIRMATION_FILTERS = [
 
 # ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
-
-# 1. BULLETPROOF TELEGRAM ALERT CONTROLS (Using direct session assignment callback hooks)
-st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
-st.sidebar.caption("Toggle ON/OFF independently.")
-
-def update_nse(): st.session_state.chk_nse_alert = st.session_state._t_nse
-def update_crypto(): st.session_state.chk_crypto_alert = st.session_state._t_crypto
-def update_forex(): st.session_state.chk_forex_alert = st.session_state._t_forex
-def update_mcx(): st.session_state.chk_mcx_alert = st.session_state._t_mcx
-
-st.sidebar.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert, key="_t_nse", on_change=update_nse)
-st.sidebar.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert, key="_t_crypto", on_change=update_crypto)
-st.sidebar.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert, key="_t_forex", on_change=update_forex)
-st.sidebar.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert, key="_t_mcx", on_change=update_mcx)
+st.sidebar.markdown("🚀 **Autonomous Mode Active** (All markets scanned in real-time)")
 
 st.sidebar.markdown("---")
 
@@ -345,16 +326,12 @@ with tab1:
 
     if asset_input in st.session_state.nse_watchlist:
         current_cat_label = "NSE (Equity Cash & F&O)"
-        telegram_allowed = st.session_state.chk_nse_alert
     elif asset_input in st.session_state.crypto_watchlist:
         current_cat_label = "Crypto Futures"
-        telegram_allowed = st.session_state.chk_crypto_alert
     elif asset_input in st.session_state.forex_watchlist:
         current_cat_label = "FOREX Major Pairs"
-        telegram_allowed = st.session_state.chk_forex_alert
     else:
         current_cat_label = "MCX Commodities"
-        telegram_allowed = st.session_state.chk_mcx_alert
 
     st.info(f"📋 **Active Scan Target:** `{scan_target_category}` | **Current Scanned Asset:** `{asset_input}`")
 
@@ -399,7 +376,7 @@ with tab1:
                     <p><b>Market Category & Asset:</b> {asset_label}</p>
                     <p><b>Confluences Found ({score}/13):</b> {', '.join(matched_confluences)}</p>
                     <p><b>Classification:</b> Intraday / Swing | High Probability Setup</p>
-                    <p><b>📱 Telegram Alert Status:</b> {'<span style="color:#00e676;"><b>DISPATCHED (ON)</b></span>' if telegram_allowed else '<span style="color:#ff5252;"><b>MUTED / BLOCKED (OFF)</b></span>'}</p>
+                    <p><b>📱 Telegram Alert Status:</b> <span style="color:#00e676;"><b>AUTO-DISPATCHED (LIVE)</b></span></p>
                     <hr style="border-color: #2a2e39;">
                     <h4>📊 Precision Trade Execution:</h4>
                     <ul>
