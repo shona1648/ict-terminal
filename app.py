@@ -312,15 +312,11 @@ with tab1:
     elif "MCX" in scan_target_category:
         active_pool = st.session_state.mcx_watchlist
 
-    # Stable asset picking without random shuffling on every rerun
-    if st.button("🔄 Pick New Asset to Scan", key="btn_pick_new_asset"):
-        if active_pool:
-            st.session_state.current_scanned_asset = random.choice(active_pool)
-
-    asset_input = st.session_state.current_scanned_asset
-    if asset_input not in active_pool and active_pool:
+    # Directly pick the first available asset or manage from active pool cleanly
+    if active_pool:
         asset_input = active_pool[0]
-        st.session_state.current_scanned_asset = asset_input
+    else:
+        asset_input = "NIFTY"
 
     if asset_input in st.session_state.nse_watchlist:
         current_cat_label = "NSE (Equity Cash & F&O)"
@@ -331,7 +327,7 @@ with tab1:
     else:
         current_cat_label = "MCX Commodities"
 
-    st.info(f"📋 **Active Scan Target:** `{scan_target_category}` | **Current Scanned Asset:** `{asset_input}`")
+    st.info(f"📋 **Active Scan Target Category:** `{scan_target_category}` | **Monitoring Asset:** `{asset_input}`")
 
     current_live_price = get_live_price(asset_input, current_cat_label)
     st.caption(f"📡 **Live Market Feed ({asset_input}):** ₹ / $ {current_live_price:,.2f}")
