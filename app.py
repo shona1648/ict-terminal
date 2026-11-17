@@ -151,15 +151,19 @@ CONFIRMATION_FILTERS = [
 # ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 
-# 1. 100% INDEPENDENT TELEGRAM ALERT DISPATCHER CONTROLS (Isolated Container)
+# 1. 100% INDEPENDENT TELEGRAM ALERT DISPATCHER CONTROLS (Using safe callback sync)
 st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
 st.sidebar.caption("Toggle ON/OFF independently.")
 
-with st.sidebar.container():
-    st.session_state.chk_nse_alert = st.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert, key="chk_nse_alert_widget")
-    st.session_state.chk_crypto_alert = st.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert, key="chk_crypto_alert_widget")
-    st.session_state.chk_forex_alert = st.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert, key="chk_forex_alert_widget")
-    st.session_state.chk_mcx_alert = st.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert, key="chk_mcx_alert_widget")
+def toggle_nse(): st.session_state.chk_nse_alert = st.session_state.widget_nse
+def toggle_crypto(): st.session_state.chk_crypto_alert = st.session_state.widget_crypto
+def toggle_forex(): st.session_state.chk_forex_alert = st.session_state.widget_forex
+def toggle_mcx(): st.session_state.chk_mcx_alert = st.session_state.widget_mcx
+
+st.sidebar.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert, key="widget_nse", on_change=toggle_nse)
+st.sidebar.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert, key="widget_crypto", on_change=toggle_crypto)
+st.sidebar.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert, key="widget_forex", on_change=toggle_forex)
+st.sidebar.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert, key="widget_mcx", on_change=toggle_mcx)
 
 st.sidebar.markdown("---")
 
