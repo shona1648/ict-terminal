@@ -151,14 +151,18 @@ CONFIRMATION_FILTERS = [
 # ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 
-# 1. 100% INDEPENDENT TELEGRAM ALERT DISPATCHER CONTROLS (No form, fully decoupled)
+# 1. COMPLETELY ISOLATED TELEGRAM ALERT CONTROLS USING @st.fragment
 st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
-st.sidebar.caption("Toggle ON/OFF independently. Fully decoupled from watchlist and dropdowns.")
+st.sidebar.caption("Toggle ON/OFF independently. Fully decoupled using Streamlit fragments.")
 
-st.sidebar.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
-st.sidebar.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
-st.sidebar.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
-st.sidebar.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
+@st.fragment
+def render_telegram_switches():
+    st.session_state.chk_nse_alert = st.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert, key="frag_nse")
+    st.session_state.chk_crypto_alert = st.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert, key="frag_crypto")
+    st.session_state.chk_forex_alert = st.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert, key="frag_forex")
+    st.session_state.chk_mcx_alert = st.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert, key="frag_mcx")
+
+render_telegram_switches()
 
 st.sidebar.markdown("---")
 
