@@ -151,14 +151,23 @@ CONFIRMATION_FILTERS = [
 # ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 
-# 1. 100% INDEPENDENT TELEGRAM ALERT CONTROLS (Direct key binding, fully decoupled)
+# 1. 100% INDEPENDENT TELEGRAM ALERT DISPATCHER CONTROLS (Wrapped safely inside a Form)
 st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
-st.sidebar.caption("Toggle ON/OFF independently. Fully decoupled from watchlist and dropdowns.")
+st.sidebar.caption("Toggle ON/OFF independently. Locked safely via form container.")
 
-st.sidebar.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
-st.sidebar.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
-st.sidebar.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
-st.sidebar.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
+with st.sidebar.form(key="telegram_alert_form"):
+    f_nse = st.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert)
+    f_crypto = st.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert)
+    f_forex = st.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert)
+    f_mcx = st.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert)
+    
+    submit_alerts = st.form_submit_button("💾 Lock / Save Alert States")
+    if submit_alerts:
+        st.session_state.chk_nse_alert = f_nse
+        st.session_state.chk_crypto_alert = f_crypto
+        st.session_state.chk_forex_alert = f_forex
+        st.session_state.chk_mcx_alert = f_mcx
+        st.success("Alert states locked successfully!")
 
 st.sidebar.markdown("---")
 
