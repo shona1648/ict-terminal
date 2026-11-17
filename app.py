@@ -153,12 +153,13 @@ st.sidebar.markdown("### 🏛️ Terminal Controls")
 
 # 1. 100% INDEPENDENT TELEGRAM ALERT DISPATCHER CONTROLS
 st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
-st.sidebar.caption("Toggle ON/OFF independently. Fully decoupled.")
+st.sidebar.caption("Toggle ON/OFF independently. Session state bound.")
 
-st.sidebar.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
-st.sidebar.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
-st.sidebar.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
-st.sidebar.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
+# Direct state management without intermediate conflicting keys
+st.session_state.chk_nse_alert = st.sidebar.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert)
+st.session_state.chk_crypto_alert = st.sidebar.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert)
+st.session_state.chk_forex_alert = st.sidebar.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert)
+st.session_state.chk_mcx_alert = st.sidebar.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert)
 
 st.sidebar.markdown("---")
 
