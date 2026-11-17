@@ -154,14 +154,19 @@ CONFIRMATION_FILTERS = [
 # ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 
-# 1. TELEGRAM ALERT CONTROLS (Using direct session state keys without fragment conflict)
+# 1. BULLETPROOF TELEGRAM ALERT CONTROLS (Using direct session assignment callback hooks)
 st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
 st.sidebar.caption("Toggle ON/OFF independently.")
 
-st.sidebar.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
-st.sidebar.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
-st.sidebar.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
-st.sidebar.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
+def update_nse(): st.session_state.chk_nse_alert = st.session_state._t_nse
+def update_crypto(): st.session_state.chk_crypto_alert = st.session_state._t_crypto
+def update_forex(): st.session_state.chk_forex_alert = st.session_state._t_forex
+def update_mcx(): st.session_state.chk_mcx_alert = st.session_state._t_mcx
+
+st.sidebar.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert, key="_t_nse", on_change=update_nse)
+st.sidebar.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert, key="_t_crypto", on_change=update_crypto)
+st.sidebar.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert, key="_t_forex", on_change=update_forex)
+st.sidebar.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert, key="_t_mcx", on_change=update_mcx)
 
 st.sidebar.markdown("---")
 
