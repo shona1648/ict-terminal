@@ -151,19 +151,19 @@ CONFIRMATION_FILTERS = [
 # ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 
-# 1. 100% INDEPENDENT TELEGRAM ALERT DISPATCHER CONTROLS (Using safe callback sync)
+# 1. 100% STABLE TELEGRAM ALERT DISPATCHER CONTROLS (Using direct session binding & explicit callbacks)
 st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
-st.sidebar.caption("Toggle ON/OFF independently.")
+st.sidebar.caption("Toggle ON/OFF independently. Locked with state callbacks.")
 
-def toggle_nse(): st.session_state.chk_nse_alert = st.session_state.widget_nse
-def toggle_crypto(): st.session_state.chk_crypto_alert = st.session_state.widget_crypto
-def toggle_forex(): st.session_state.chk_forex_alert = st.session_state.widget_forex
-def toggle_mcx(): st.session_state.chk_mcx_alert = st.session_state.widget_mcx
+def change_nse(): st.session_state.chk_nse_alert = st.session_state._cb_nse
+def change_crypto(): st.session_state.chk_crypto_alert = st.session_state._cb_crypto
+def change_forex(): st.session_state.chk_forex_alert = st.session_state._cb_forex
+def change_mcx(): st.session_state.chk_mcx_alert = st.session_state._cb_mcx
 
-st.sidebar.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert, key="widget_nse", on_change=toggle_nse)
-st.sidebar.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert, key="widget_crypto", on_change=toggle_crypto)
-st.sidebar.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert, key="widget_forex", on_change=toggle_forex)
-st.sidebar.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert, key="widget_mcx", on_change=toggle_mcx)
+st.sidebar.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert, key="_cb_nse", on_change=change_nse)
+st.sidebar.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert, key="_cb_crypto", on_change=change_crypto)
+st.sidebar.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert, key="_cb_forex", on_change=change_forex)
+st.sidebar.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert, key="_cb_mcx", on_change=change_mcx)
 
 st.sidebar.markdown("---")
 
