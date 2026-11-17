@@ -32,7 +32,7 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# Initialize Telegram Alert Master Switches safely in session_state
+# Initialize Telegram Alert Master Switches independently in session_state
 if 'chk_nse_alert' not in st.session_state: st.session_state.chk_nse_alert = True
 if 'chk_crypto_alert' not in st.session_state: st.session_state.chk_crypto_alert = True
 if 'chk_forex_alert' not in st.session_state: st.session_state.chk_forex_alert = True
@@ -148,25 +148,27 @@ CONFIRMATION_FILTERS = [
     "Zero-Line Crossover", "Multi-Timeframe Sweep"
 ]
 
-# Sidebar Controls
+# ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
+
+# 1. INDEPENDENT TELEGRAM ALERT DISPATCHER CONTROLS (Placed at top so they never depend on dropdowns)
+st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
+st.sidebar.caption("Toggle ON/OFF independently for each market.")
+
+st.sidebar.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
+st.sidebar.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
+st.sidebar.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
+st.sidebar.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
+
+st.sidebar.markdown("---")
+
+# 2. WATCHLIST MANAGER (Independent Dropdown Selector)
 selected_market = st.sidebar.selectbox(
-    "Select Market Category",
+    "Select Market Category (For Watchlist Management)",
     ["NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"],
     key="select_market_category_box"
 )
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
-st.sidebar.caption("Toggle ON/OFF independently to permit or block Telegram alerts.")
-
-# Bulletproof Checkboxes with direct session state sync
-st.session_state.chk_nse_alert = st.sidebar.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert, key="cb_nse")
-st.session_state.chk_crypto_alert = st.sidebar.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert, key="cb_crypto")
-st.session_state.chk_forex_alert = st.sidebar.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert, key="cb_forex")
-st.session_state.chk_mcx_alert = st.sidebar.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert, key="cb_mcx")
-
-st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Watchlist Manager Box")
 
 # Category-wise Unified Add & Single Dropdown Box Manager
@@ -271,13 +273,15 @@ else:
             st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
 st.sidebar.markdown("---")
+
+# 3. RISK & POSITION SIZING
 st.sidebar.markdown("### 🧮 Risk & Position Sizing")
 capital = st.sidebar.number_input("Trading Capital (₹ / $)", value=50000, step=5000, key="input_capital_amt")
 risk_pct = st.sidebar.slider("Risk Per Trade (%)", 0.5, 3.0, 1.0, 0.5, key="slider_risk_pct")
 allowed_risk_amount = capital * (risk_pct / 100)
 st.sidebar.info(f"Allowed Risk Amount: ₹{allowed_risk_amount:,.2f}")
 
-# Main Dashboard Interface
+# ==================== MAIN DASHBOARD INTERFACE ====================
 st.title("🏛️ Institutional ICT AI Trading Terminal")
 st.markdown("**Master Blueprint Terminal | Live Autonomous Surveillance & Price Action Engine**")
 
@@ -305,7 +309,7 @@ with tab1:
     with col2:
         scan_mode = st.selectbox("Scan Mode", ["24/7 Autonomous Stream", "Instant Deep Scan"], key="select_scan_mode_type")
 
-    # Scanning pool includes all assets across markets independently of telegram switches
+    # Scanning pool includes all assets across markets independently
     active_pool = []
     if "All Markets" in scan_target_category:
         active_pool.extend(st.session_state.nse_watchlist)
