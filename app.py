@@ -151,24 +151,18 @@ CONFIRMATION_FILTERS = [
 # ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 
-# 1. INDEPENDENT TELEGRAM ALERT DISPATCHER CONTROLS WRAPPED IN A FORM
+# 1. 100% INDEPENDENT TELEGRAM ALERT DISPATCHER CONTROLS (No form, fully decoupled)
 st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
-st.sidebar.caption("Toggle ON/OFF independently. Changes apply safely without resetting.")
+st.sidebar.caption("Toggle ON/OFF independently. Fully decoupled from watchlist and dropdowns.")
 
-with st.sidebar.form(key="telegram_alert_form"):
-    st.session_state.chk_nse_alert = st.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert)
-    st.session_state.chk_crypto_alert = st.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert)
-    st.session_state.chk_forex_alert = st.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert)
-    st.session_state.chk_mcx_alert = st.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert)
-    
-    # Form submit button to save alert states
-    submit_alerts = st.form_submit_button("💾 Save Alert Preferences")
-    if submit_alerts:
-        st.success("Alert preferences saved successfully!")
+st.sidebar.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
+st.sidebar.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
+st.sidebar.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
+st.sidebar.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
 
 st.sidebar.markdown("---")
 
-# 2. WATCHLIST MANAGER (Completely Independent Dropdown Selector)
+# 2. WATCHLIST MANAGER (Independent Dropdown Selector)
 selected_market = st.sidebar.selectbox(
     "Select Market Category (For Watchlist Management)",
     ["NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"],
