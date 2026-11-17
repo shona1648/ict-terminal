@@ -32,7 +32,7 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# Initialize Telegram Alert Master Switches independently in session_state
+# Initialize Telegram Alert Master Switches safely in session_state
 if 'chk_nse_alert' not in st.session_state: st.session_state.chk_nse_alert = True
 if 'chk_crypto_alert' not in st.session_state: st.session_state.chk_crypto_alert = True
 if 'chk_forex_alert' not in st.session_state: st.session_state.chk_forex_alert = True
@@ -151,14 +151,14 @@ CONFIRMATION_FILTERS = [
 # ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 
-# 1. INDEPENDENT TELEGRAM ALERT DISPATCHER CONTROLS (Placed at top so they never depend on dropdowns)
+# 1. INDEPENDENT TELEGRAM ALERT DISPATCHER CONTROLS (Fully decoupled with explicit value mapping)
 st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
 st.sidebar.caption("Toggle ON/OFF independently for each market.")
 
-st.sidebar.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
-st.sidebar.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
-st.sidebar.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
-st.sidebar.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
+st.session_state.chk_nse_alert = st.sidebar.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert, key="cb_nse_alert")
+st.session_state.chk_crypto_alert = st.sidebar.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert, key="cb_crypto_alert")
+st.session_state.chk_forex_alert = st.sidebar.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert, key="cb_forex_alert")
+st.session_state.chk_mcx_alert = st.sidebar.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert, key="cb_mcx_alert")
 
 st.sidebar.markdown("---")
 
