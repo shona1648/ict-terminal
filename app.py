@@ -154,18 +154,14 @@ CONFIRMATION_FILTERS = [
 # ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 
-# 1. ISOLATED TELEGRAM ALERT CONTROLS (Using Fragment to prevent any cross-rerun resetting)
+# 1. TELEGRAM ALERT CONTROLS (Using direct session state keys without fragment conflict)
 st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
 st.sidebar.caption("Toggle ON/OFF independently.")
 
-@st.fragment
-def render_telegram_controls():
-    st.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
-    st.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
-    st.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
-    st.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
-
-render_telegram_controls()
+st.sidebar.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
+st.sidebar.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
+st.sidebar.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
+st.sidebar.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
 
 st.sidebar.markdown("---")
 
