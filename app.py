@@ -32,7 +32,7 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# Initialize Telegram Alert Master Switches in session_state
+# Initialize Telegram Alert Master Switches safely
 if 'chk_nse_alert' not in st.session_state: st.session_state.chk_nse_alert = True
 if 'chk_crypto_alert' not in st.session_state: st.session_state.chk_crypto_alert = True
 if 'chk_forex_alert' not in st.session_state: st.session_state.chk_forex_alert = True
@@ -160,11 +160,11 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
 st.sidebar.caption("Toggle ON/OFF independently to permit or block Telegram alerts.")
 
-# Bulletproof Checkboxes using explicit value from session_state
-st.sidebar.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert, key="chk_nse_alert")
-st.sidebar.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert, key="chk_crypto_alert")
-st.sidebar.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert, key="chk_forex_alert")
-st.sidebar.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert, key="chk_mcx_alert")
+# 100% Reliable Checkboxes bound directly to session state
+st.sidebar.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
+st.sidebar.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
+st.sidebar.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
+st.sidebar.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Watchlist Manager Box")
