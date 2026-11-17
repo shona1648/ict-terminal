@@ -38,6 +38,9 @@ if 'chk_crypto_alert' not in st.session_state: st.session_state.chk_crypto_alert
 if 'chk_forex_alert' not in st.session_state: st.session_state.chk_forex_alert = True
 if 'chk_mcx_alert' not in st.session_state: st.session_state.chk_mcx_alert = True
 
+if 'current_scanned_asset' not in st.session_state:
+    st.session_state.current_scanned_asset = "NIFTY"
+
 # --- PROFESSIONAL LIVE DATA FETCHING ENGINE ---
 def get_live_price(symbol, market_type):
     sym = symbol.strip().upper()
@@ -151,19 +154,18 @@ CONFIRMATION_FILTERS = [
 # ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 
-# 1. 100% STABLE TELEGRAM ALERT DISPATCHER CONTROLS (Using direct session binding & explicit callbacks)
+# 1. ISOLATED TELEGRAM ALERT CONTROLS (Using Fragment to prevent any cross-rerun resetting)
 st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
-st.sidebar.caption("Toggle ON/OFF independently. Locked with state callbacks.")
+st.sidebar.caption("Toggle ON/OFF independently.")
 
-def change_nse(): st.session_state.chk_nse_alert = st.session_state._cb_nse
-def change_crypto(): st.session_state.chk_crypto_alert = st.session_state._cb_crypto
-def change_forex(): st.session_state.chk_forex_alert = st.session_state._cb_forex
-def change_mcx(): st.session_state.chk_mcx_alert = st.session_state._cb_mcx
+@st.fragment
+def render_telegram_controls():
+    st.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
+    st.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
+    st.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
+    st.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
 
-st.sidebar.checkbox("🟢 NSE Telegram Alerts", value=st.session_state.chk_nse_alert, key="_cb_nse", on_change=change_nse)
-st.sidebar.checkbox("🪙 Crypto Telegram Alerts", value=st.session_state.chk_crypto_alert, key="_cb_crypto", on_change=change_crypto)
-st.sidebar.checkbox("💱 Forex Telegram Alerts", value=st.session_state.chk_forex_alert, key="_cb_forex", on_change=change_forex)
-st.sidebar.checkbox("🛢️ MCX Telegram Alerts", value=st.session_state.chk_mcx_alert, key="_cb_mcx", on_change=change_mcx)
+render_telegram_controls()
 
 st.sidebar.markdown("---")
 
@@ -330,7 +332,15 @@ with tab1:
     elif "MCX" in scan_target_category:
         active_pool = st.session_state.mcx_watchlist
 
-    asset_input = random.choice(active_pool) if active_pool else "NIFTY"
+    # Stable asset picking without random shuffling on every rerun
+    if st.button("🔄 Pick New Asset to Scan", key="btn_pick_new_asset"):
+        if active_pool:
+            st.session_state.current_scanned_asset = random.choice(active_pool)
+
+    asset_input = st.session_state.current_scanned_asset
+    if asset_input not in active_pool and active_pool:
+        asset_input = active_pool[0]
+        st.session_state.current_scanned_asset = asset_input
 
     if asset_input in st.session_state.nse_watchlist:
         current_cat_label = "NSE (Equity Cash & F&O)"
@@ -345,7 +355,7 @@ with tab1:
         current_cat_label = "MCX Commodities"
         telegram_allowed = st.session_state.chk_mcx_alert
 
-    st.info(f"📋 **Active Scan Target:** `{scan_target_category}` | **Randomly Picked Asset:** `{asset_input}`")
+    st.info(f"📋 **Active Scan Target:** `{scan_target_category}` | **Current Scanned Asset:** `{asset_input}`")
 
     current_live_price = get_live_price(asset_input, current_cat_label)
     st.caption(f"📡 **Live Market Feed ({asset_input}):** ₹ / $ {current_live_price:,.2f}")
