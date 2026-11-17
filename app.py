@@ -22,7 +22,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Session State Watchlists & Toggles Safely
+# Initialize Session State Watchlists & Toggles Safely with explicit default values
 if 'nse_watchlist' not in st.session_state:
     st.session_state.nse_watchlist = ["NIFTY", "BANKNIFTY", "RELIANCE", "TATASTEEL"]
 if 'crypto_watchlist' not in st.session_state:
@@ -32,13 +32,13 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# Initialize Telegram Alert Master Switches in session_state
+# Initialize Telegram Alert Master Switches safely
 if 'chk_nse_alert' not in st.session_state: st.session_state.chk_nse_alert = True
 if 'chk_crypto_alert' not in st.session_state: st.session_state.chk_crypto_alert = True
 if 'chk_forex_alert' not in st.session_state: st.session_state.chk_forex_alert = True
 if 'chk_mcx_alert' not in st.session_state: st.session_state.chk_mcx_alert = True
 
-# --- PROFESSIONAL LIVE DATA FETCHING ENGINE (Yahoo Finance for Crypto/Forex & Dhan for NSE/MCX) ---
+# --- PROFESSIONAL LIVE DATA FETCHING ENGINE ---
 def get_live_price(symbol, market_type):
     sym = symbol.strip().upper()
     try:
@@ -57,7 +57,6 @@ def get_live_price(symbol, market_type):
                 return float(res['chart']['result'][0]['meta']['regularMarketPrice'])
                 
         elif "NSE" in market_type:
-            # 🔌 DHAN API INTEGRATION POINT FOR NSE EQUITIES & INDICES
             test_sym = sym if sym in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"] else (sym if sym.endswith(".NS") else sym + ".NS")
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
             headers = {'User-Agent': 'Mozilla/5.0'}
@@ -65,7 +64,6 @@ def get_live_price(symbol, market_type):
             return float(res['chart']['result'][0]['meta']['regularMarketPrice'])
             
         elif "MCX" in market_type:
-            # 🔌 DHAN COMMODITY API INTEGRATION POINT FOR MCX
             test_sym = sym if sym.endswith("=F") else sym + "=F"
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
             headers = {'User-Agent': 'Mozilla/5.0'}
@@ -160,8 +158,9 @@ selected_market = st.sidebar.selectbox(
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
-st.sidebar.caption("Toggle ON/OFF to permit or block Telegram alerts for specific markets during scanning.")
+st.sidebar.caption("Toggle ON/OFF independently to permit or block Telegram alerts for specific markets.")
 
+# Independent Checkboxes tied directly to session_state keys
 st.sidebar.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
 st.sidebar.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
 st.sidebar.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
@@ -170,7 +169,7 @@ st.sidebar.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Watchlist Manager Box")
 
-# Category-wise Unified Add & Single Dropdown Box Manager (Selectbox + Remove Button)
+# Category-wise Unified Add & Single Dropdown Box Manager
 if selected_market.startswith("NSE"):
     st.sidebar.markdown("**🟢 NSE Watchlist (Dhan Account Feed)**")
     new_nse = st.sidebar.text_input("Add Symbol", key="input_nse_box", placeholder="e.g. RELIANCE, SBIN")
@@ -306,7 +305,7 @@ with tab1:
     with col2:
         scan_mode = st.selectbox("Scan Mode", ["24/7 Autonomous Stream", "Instant Deep Scan"], key="select_scan_mode_type")
 
-    # Scanning pool includes all assets across markets regardless of telegram switches
+    # Scanning pool includes all assets across markets independently of telegram switches
     active_pool = []
     if "All Markets" in scan_target_category:
         active_pool.extend(st.session_state.nse_watchlist)
