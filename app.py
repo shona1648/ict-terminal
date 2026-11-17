@@ -147,8 +147,6 @@ CONFIRMATION_FILTERS = [
 
 # ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
-st.sidebar.markdown("🚀 **Autonomous Mode Active** (All markets scanned in real-time)")
-
 st.sidebar.markdown("---")
 
 # 2. WATCHLIST MANAGER (Independent Dropdown Selector)
