@@ -32,7 +32,7 @@ if 'forex_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# Initialize Toggles in session_state directly using keys
+# Initialize Telegram Alert Master Switches in session_state
 if 'chk_nse_alert' not in st.session_state: st.session_state.chk_nse_alert = True
 if 'chk_crypto_alert' not in st.session_state: st.session_state.chk_crypto_alert = True
 if 'chk_forex_alert' not in st.session_state: st.session_state.chk_forex_alert = True
@@ -159,12 +159,13 @@ selected_market = st.sidebar.selectbox(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 🔔 Global Alert Controls (Master Switches)")
+st.sidebar.markdown("### 📲 Telegram Alert Dispatcher Controls")
+st.sidebar.caption("Toggle ON/OFF to permit or block Telegram alerts for specific markets during scanning.")
 
-st.sidebar.checkbox("🟢 NSE Alerts Active", key="chk_nse_alert")
-st.sidebar.checkbox("🪙 Crypto Alerts Active", key="chk_crypto_alert")
-st.sidebar.checkbox("💱 Forex Alerts Active", key="chk_forex_alert")
-st.sidebar.checkbox("🛢️ MCX Alerts Active", key="chk_mcx_alert")
+st.sidebar.checkbox("🟢 NSE Telegram Alerts", key="chk_nse_alert")
+st.sidebar.checkbox("🪙 Crypto Telegram Alerts", key="chk_crypto_alert")
+st.sidebar.checkbox("💱 Forex Telegram Alerts", key="chk_forex_alert")
+st.sidebar.checkbox("🛢️ MCX Telegram Alerts", key="chk_mcx_alert")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📂 Watchlist Manager Box")
@@ -290,11 +291,7 @@ with tab1:
     # --- ADVANCED SCAN CONTROLS ---
     col1, col2 = st.columns(2)
     with col1:
-        available_scan_targets = ["All Markets (Global Scan)"]
-        if st.session_state.chk_nse_alert: available_scan_targets.append("NSE (Equity Cash & F&O)")
-        if st.session_state.chk_crypto_alert: available_scan_targets.append("Crypto Futures")
-        if st.session_state.chk_forex_alert: available_scan_targets.append("FOREX Major Pairs")
-        if st.session_state.chk_mcx_alert: available_scan_targets.append("MCX Commodities")
+        available_scan_targets = ["All Markets (Global Scan)", "NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
         
         current_sel_target = st.session_state.get("select_scan_target_cat", "All Markets (Global Scan)")
         if current_sel_target not in available_scan_targets:
@@ -309,44 +306,38 @@ with tab1:
     with col2:
         scan_mode = st.selectbox("Scan Mode", ["24/7 Autonomous Stream", "Instant Deep Scan"], key="select_scan_mode_type")
 
-    # Build active asset pool independently based on session states
+    # Scanning pool includes all assets across markets regardless of telegram switches
     active_pool = []
     if "All Markets" in scan_target_category:
-        if st.session_state.chk_nse_alert: active_pool.extend(st.session_state.nse_watchlist)
-        if st.session_state.chk_crypto_alert: active_pool.extend(st.session_state.crypto_watchlist)
-        if st.session_state.chk_forex_alert: active_pool.extend(st.session_state.forex_watchlist)
-        if st.session_state.chk_mcx_alert: active_pool.extend(st.session_state.mcx_watchlist)
+        active_pool.extend(st.session_state.nse_watchlist)
+        active_pool.extend(st.session_state.crypto_watchlist)
+        active_pool.extend(st.session_state.forex_watchlist)
+        active_pool.extend(st.session_state.mcx_watchlist)
     elif "NSE" in scan_target_category:
-        active_pool = st.session_state.nse_watchlist if st.session_state.chk_nse_alert else []
+        active_pool = st.session_state.nse_watchlist
     elif "Crypto" in scan_target_category:
-        active_pool = st.session_state.crypto_watchlist if st.session_state.chk_crypto_alert else []
+        active_pool = st.session_state.crypto_watchlist
     elif "FOREX" in scan_target_category:
-        active_pool = st.session_state.forex_watchlist if st.session_state.chk_forex_alert else []
+        active_pool = st.session_state.forex_watchlist
     elif "MCX" in scan_target_category:
-        active_pool = st.session_state.mcx_watchlist if st.session_state.chk_mcx_alert else []
+        active_pool = st.session_state.mcx_watchlist
 
-    if active_pool:
-        asset_input = random.choice(active_pool)
-    else:
-        asset_input = "NIFTY"
+    asset_input = random.choice(active_pool) if active_pool else "NIFTY"
 
     if asset_input in st.session_state.nse_watchlist:
         current_cat_label = "NSE (Equity Cash & F&O)"
-        current_toggle_status = st.session_state.chk_nse_alert
+        telegram_allowed = st.session_state.chk_nse_alert
     elif asset_input in st.session_state.crypto_watchlist:
         current_cat_label = "Crypto Futures"
-        current_toggle_status = st.session_state.chk_crypto_alert
+        telegram_allowed = st.session_state.chk_crypto_alert
     elif asset_input in st.session_state.forex_watchlist:
         current_cat_label = "FOREX Major Pairs"
-        current_toggle_status = st.session_state.chk_forex_alert
+        telegram_allowed = st.session_state.chk_forex_alert
     else:
         current_cat_label = "MCX Commodities"
-        current_toggle_status = st.session_state.chk_mcx_alert
+        telegram_allowed = st.session_state.chk_mcx_alert
 
     st.info(f"📋 **Active Scan Target:** `{scan_target_category}` | **Randomly Picked Asset:** `{asset_input}`")
-
-    if not active_pool:
-        st.error("⚠️ **No markets selected or corresponding alerts are toggled OFF!** Please enable at least one alert in the sidebar or choose an active scan target.")
 
     current_live_price = get_live_price(asset_input, current_cat_label)
     st.caption(f"📡 **Live Market Feed ({asset_input}):** ₹ / $ {current_live_price:,.2f}")
@@ -382,13 +373,14 @@ with tab1:
                 t3 = entry_price + (risk_per_unit * 5)
                 rr_ratio = "1 : 4.5"
 
-                if score >= 5 and current_toggle_status:
+                if score >= 5:
                     st.markdown(f"""
                     <div class="alert-box">
                     <h3>🎯 STRATEGY MATCHED: {matched_strat} (Rank 1 Setup)</h3>
                     <p><b>Market Category & Asset:</b> {asset_label}</p>
                     <p><b>Confluences Found ({score}/13):</b> {', '.join(matched_confluences)}</p>
                     <p><b>Classification:</b> Intraday / Swing | High Probability Setup</p>
+                    <p><b>📱 Telegram Alert Status:</b> {'<span style="color:#00e676;"><b>DISPATCHED (ON)</b></span>' if telegram_allowed else '<span style="color:#ff5252;"><b>MUTED / BLOCKED (OFF)</b></span>'}</p>
                     <hr style="border-color: #2a2e39;">
                     <h4>📊 Precision Trade Execution:</h4>
                     <ul>
@@ -417,8 +409,8 @@ with tab1:
                 else:
                     st.markdown("""
                     <div class="no-trade-box">
-                    <h3>⚠️ Strict No-Trade Filter Active (or Alerts Disabled)</h3>
-                    <p>Insufficient confluences detected or category alerts toggled OFF. Market structure is in consolidation. Stand aside.</p>
+                    <h3>⚠️ Strict No-Trade Filter Active</h3>
+                    <p>Insufficient confluences detected. Market structure is in consolidation. Stand aside.</p>
                     </div>
                     """, unsafe_allow_html=True)
 
