@@ -20,17 +20,15 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Session State Watchlists Safely
+# Initialize Session State Watchlists Safely (Forex Removed)
 if 'nse_watchlist' not in st.session_state:
     st.session_state.nse_watchlist = ["NIFTY", "BANKNIFTY", "RELIANCE", "TATASTEEL"]
 if 'crypto_watchlist' not in st.session_state:
     st.session_state.crypto_watchlist = ["BTC-USD", "ETH-USD", "SOL-USD"]
-if 'forex_watchlist' not in st.session_state:
-    st.session_state.forex_watchlist = ["EURUSD", "GBPUSD", "USDJPY"]
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# --- PROFESSIONAL LIVE DATA FETCHING ENGINE ---
+# --- PROFESSIONAL LIVE DATA FETCHING ENGINE (Forex Removed) ---
 def get_live_price(symbol, market_type):
     sym = symbol.strip().upper()
     try:
@@ -40,13 +38,6 @@ def get_live_price(symbol, market_type):
             headers = {'User-Agent': 'Mozilla/5.0'}
             res = requests.get(url, headers=headers, timeout=2).json()
             return float(res['chart']['result'][0]['meta']['regularMarketPrice'])
-            
-        elif "FOREX" in market_type:
-            if len(sym) == 6:
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}=X"
-                headers = {'User-Agent': 'Mozilla/5.0'}
-                res = requests.get(url, headers=headers, timeout=2).json()
-                return float(res['chart']['result'][0]['meta']['regularMarketPrice'])
                 
         elif "NSE" in market_type:
             test_sym = sym if sym in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"] else (sym if sym.endswith(".NS") else sym + ".NS")
@@ -65,7 +56,7 @@ def get_live_price(symbol, market_type):
         pass
     return 1000.00
 
-# --- STRICT ONLINE SYMBOL VALIDATION FUNCTIONS ---
+# --- STRICT ONLINE SYMBOL VALIDATION FUNCTIONS (Forex Removed) ---
 def verify_nse_symbol(symbol):
     sym = symbol.strip().upper()
     if sym in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"]:
@@ -94,19 +85,6 @@ def verify_crypto_symbol(symbol):
         pass
     return False, sym
 
-def verify_forex_symbol(symbol):
-    sym = symbol.strip().upper()
-    if len(sym) == 6 and sym.isalpha():
-        try:
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}=X"
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            res = requests.get(url, headers=headers, timeout=3).json()
-            if res.get('chart') and res['chart'].get('result'):
-                return True, sym
-        except:
-            pass
-    return False, sym
-
 def verify_mcx_symbol(symbol):
     sym = symbol.strip().upper()
     if sym == "CRUDE": sym = "CRUDEOIL"
@@ -125,10 +103,10 @@ def verify_mcx_symbol(symbol):
 st.sidebar.markdown("### 🏛️ Terminal Controls")
 st.sidebar.markdown("---")
 
-# Watchlist Manager Selector
+# Watchlist Manager Selector (Forex Option Removed)
 selected_market = st.sidebar.selectbox(
     "Select Market Category (For Watchlist Management)",
-    ["NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"],
+    ["NSE (Equity Cash & F&O)", "Crypto Futures", "MCX Commodities"],
     key="select_market_category_box"
 )
 
@@ -184,31 +162,6 @@ elif selected_market.startswith("Crypto"):
         else:
             st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
-elif selected_market.startswith("FOREX"):
-    st.sidebar.markdown("**💱 FOREX Watchlist**")
-    new_forex = st.sidebar.text_input("Add Symbol", key="input_forex_box", placeholder="e.g. EURUSD")
-    if st.sidebar.button("➕ Add to Watchlist", key="btn_add_forex_symbol"):
-        if new_forex:
-            is_valid, verified_sym = verify_forex_symbol(new_forex)
-            if is_valid:
-                if verified_sym in st.session_state.forex_watchlist:
-                    st.sidebar.warning(f"⚠️ '{verified_sym}' already exists!")
-                else:
-                    st.session_state.forex_watchlist.append(verified_sym)
-                    st.sidebar.success(f"✅ Added {verified_sym}!")
-                    st.rerun()
-            else:
-                st.sidebar.error("❌ Invalid Forex pair!")
-                
-    selected_forex_item = st.sidebar.selectbox("📋 Watchlist Box", st.session_state.forex_watchlist, key="sel_forex_box")
-    if st.sidebar.button("❌ Remove Selected Symbol", key="btn_rem_forex"):
-        if len(st.session_state.forex_watchlist) > 1:
-            st.session_state.forex_watchlist.remove(selected_forex_item)
-            st.sidebar.success(f"Removed {selected_forex_item}")
-            st.rerun()
-        else:
-            st.sidebar.warning("⚠️ Keep at least 1 symbol!")
-
 else:
     st.sidebar.markdown("**🛢️ MCX Watchlist**")
     new_mcx = st.sidebar.text_input("Add Symbol", key="input_mcx_box", placeholder="e.g. CRUDEOIL, GOLD")
@@ -255,7 +208,7 @@ with tab1:
 
     col1, col2 = st.columns(2)
     with col1:
-        available_scan_targets = ["All Markets (Global Scan)", "NSE (Equity Cash & F&O)", "Crypto Futures", "FOREX Major Pairs", "MCX Commodities"]
+        available_scan_targets = ["All Markets (Global Scan)", "NSE (Equity Cash & F&O)", "Crypto Futures", "MCX Commodities"]
         scan_target_category = st.selectbox("🎯 Target Scan Category", available_scan_targets, key="select_scan_target_cat")
     with col2:
         scan_mode = st.selectbox("Scan Mode", ["24/7 Autonomous Stream", "Instant Deep Scan"], key="select_scan_mode_type")
@@ -264,14 +217,11 @@ with tab1:
     if "All Markets" in scan_target_category:
         active_pool.extend(st.session_state.nse_watchlist)
         active_pool.extend(st.session_state.crypto_watchlist)
-        active_pool.extend(st.session_state.forex_watchlist)
         active_pool.extend(st.session_state.mcx_watchlist)
     elif "NSE" in scan_target_category:
         active_pool = st.session_state.nse_watchlist
     elif "Crypto" in scan_target_category:
         active_pool = st.session_state.crypto_watchlist
-    elif "FOREX" in scan_target_category:
-        active_pool = st.session_state.forex_watchlist
     elif "MCX" in scan_target_category:
         active_pool = st.session_state.mcx_watchlist
 
@@ -281,8 +231,6 @@ with tab1:
         current_cat_label = "NSE (Equity Cash & F&O)"
     elif asset_input in st.session_state.crypto_watchlist:
         current_cat_label = "Crypto Futures"
-    elif asset_input in st.session_state.forex_watchlist:
-        current_cat_label = "FOREX Major Pairs"
     else:
         current_cat_label = "MCX Commodities"
 
