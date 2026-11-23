@@ -28,76 +28,102 @@ if 'crypto_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# --- PROFESSIONAL LIVE DATA FETCHING ENGINE (Forex Removed) ---
-def get_live_price(symbol, market_type):
-    sym = symbol.strip().upper()
-    try:
-        if "Crypto" in market_type:
-            test_sym = sym if sym.endswith("-USD") else sym + "-USD"
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            res = requests.get(url, headers=headers, timeout=2).json()
-            return float(res['chart']['result'][0]['meta']['regularMarketPrice'])
-                
-        elif "NSE" in market_type:
-            test_sym = sym if sym in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"] else (sym if sym.endswith(".NS") else sym + ".NS")
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            res = requests.get(url, headers=headers, timeout=2).json()
-            return float(res['chart']['result'][0]['meta']['regularMarketPrice'])
-            
-        elif "MCX" in market_type:
-            test_sym = sym if sym.endswith("=F") else sym + "=F"
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            res = requests.get(url, headers=headers, timeout=2).json()
-            return float(res['chart']['result'][0]['meta']['regularMarketPrice'])
-    except:
-        pass
-    return 1000.00
+# --- CRYPTO (YAHOO FINANCE) & NSE/MCX (DHAN FEED) ENGINE ---
+YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{}"
+YAHOO_HEADERS = {"User-Agent": "Mozilla/5.0"}
 
-# --- STRICT ONLINE SYMBOL VALIDATION FUNCTIONS (Forex Removed) ---
+
+def get_feed_provider(market_type):
+    if "Crypto" in market_type:
+        return "Yahoo Finance"
+    if "NSE" in market_type or "MCX" in market_type:
+        return "Dhan Feed"
+    return "Unknown Feed"
+
+
+def resolve_crypto_yahoo_ticker(symbol):
+    sym = symbol.strip().upper()
+    if not sym:
+        return None
+    return sym if sym.endswith("-USD") else f"{sym}-USD"
+
+
+def fetch_yahoo_chart_result(ticker, timeout=5):
+    if not ticker:
+        return None
+    try:
+        resp = requests.get(
+            YAHOO_CHART_URL.format(ticker),
+            headers=YAHOO_HEADERS,
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+        results = (payload.get("chart") or {}).get("result") or []
+        return results[0] if results else None
+    except Exception:
+        return None
+
+
+def get_crypto_price_yahoo(symbol):
+    ticker = resolve_crypto_yahoo_ticker(symbol)
+    result = fetch_yahoo_chart_result(ticker, timeout=5)
+    if not result:
+        return None
+
+    meta = result.get("meta") or {}
+    price = meta.get("regularMarketPrice")
+    if price is None:
+        return None
+
+    try:
+        return float(price)
+    except (TypeError, ValueError):
+        return None
+
+
+def get_dhan_price(symbol, market_type):
+    """
+    Dhan Feed connector hook for NSE & MCX.
+    Wire DhanHQ live price lookup here; returns None when not yet connected.
+    """
+    _ = (symbol.strip().upper(), market_type)
+    return None
+
+
+def get_live_price(symbol, market_type):
+    if "Crypto" in market_type:
+        return get_crypto_price_yahoo(symbol)
+    if "NSE" in market_type or "MCX" in market_type:
+        return get_dhan_price(symbol, market_type)
+    return None
+
+
+# --- SYMBOL VALIDATION FUNCTIONS ---
 def verify_nse_symbol(symbol):
     sym = symbol.strip().upper()
-    if sym in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"]:
-        return True, sym
-    test_sym = sym if sym.endswith(".NS") else sym + ".NS"
-    try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        res = requests.get(url, headers=headers, timeout=3).json()
-        if res.get('chart') and res['chart'].get('result'):
-            return True, sym
-    except:
-        pass
-    return False, sym
+    if not sym:
+        return False, sym
+    return True, sym
+
 
 def verify_crypto_symbol(symbol):
     sym = symbol.strip().upper()
-    test_sym = sym if sym.endswith("-USD") else sym + "-USD"
-    try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        res = requests.get(url, headers=headers, timeout=3).json()
-        if res.get('chart') and res['chart'].get('result'):
-            return True, test_sym
-    except:
-        pass
-    return False, sym
+    ticker = resolve_crypto_yahoo_ticker(sym)
+    result = fetch_yahoo_chart_result(ticker, timeout=5)
+    if result and (result.get("meta") or {}).get("regularMarketPrice") is not None:
+        return True, ticker
+    return False, ticker or sym
+
 
 def verify_mcx_symbol(symbol):
     sym = symbol.strip().upper()
-    if sym == "CRUDE": sym = "CRUDEOIL"
-    test_sym = sym if sym.endswith("=F") else sym + "=F"
-    try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{test_sym}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        res = requests.get(url, headers=headers, timeout=3).json()
-        if res.get('chart') and res['chart'].get('result'):
-            return True, sym
-    except:
-        pass
-    return False, sym
+    if sym == "CRUDE":
+        sym = "CRUDEOIL"
+    if not sym:
+        return False, sym
+    return True, sym
+
 
 # ==================== SIDEBAR CONTROLS ====================
 st.sidebar.markdown("### 🏛️ Terminal Controls")
@@ -127,7 +153,7 @@ if selected_market.startswith("NSE"):
                     st.rerun()
             else:
                 st.sidebar.error("❌ Invalid NSE symbol!")
-    
+
     selected_nse_item = st.sidebar.selectbox("📋 Watchlist Box", st.session_state.nse_watchlist, key="sel_nse_box")
     if st.sidebar.button("❌ Remove Selected Symbol", key="btn_rem_nse"):
         if len(st.session_state.nse_watchlist) > 1:
@@ -152,7 +178,7 @@ elif selected_market.startswith("Crypto"):
                     st.rerun()
             else:
                 st.sidebar.error("❌ Invalid Crypto ticker!")
-                
+
     selected_crypto_item = st.sidebar.selectbox("📋 Watchlist Box", st.session_state.crypto_watchlist, key="sel_crypto_box")
     if st.sidebar.button("❌ Remove Selected Symbol", key="btn_rem_crypto"):
         if len(st.session_state.crypto_watchlist) > 1:
@@ -177,7 +203,7 @@ else:
                     st.rerun()
             else:
                 st.sidebar.error("❌ Invalid MCX commodity!")
-            
+
     selected_mcx_item = st.sidebar.selectbox("📋 Watchlist Box", st.session_state.mcx_watchlist, key="sel_mcx_box")
     if st.sidebar.button("❌ Remove Selected Symbol", key="btn_rem_mcx"):
         if len(st.session_state.mcx_watchlist) > 1:
@@ -236,17 +262,29 @@ with tab1:
 
     st.info(f"📋 **Active Scan Category:** `{scan_target_category}` | **Monitoring Asset:** `{asset_input}`")
 
+    feed_source = get_feed_provider(current_cat_label)
     current_live_price = get_live_price(asset_input, current_cat_label)
-    st.caption(f"📡 **Live Market Feed ({asset_input}):** ₹ / $ {current_live_price:,.2f}")
+
+    if current_live_price is not None:
+        st.caption(f"📡 **Live Market Feed ({asset_input} • {feed_source}):** ₹ / $ {current_live_price:,.2f}")
+    else:
+        st.caption(f"📡 **Live Market Feed ({asset_input} • {feed_source}):** Awaiting Dhan Feed connection")
 
     if st.button("Run Live Price Feed Analysis", key="btn_run_institutional_scan"):
         with st.spinner(f"Fetching live data & processing structure for {asset_input}..."):
+            price_text = f"₹ / $ {current_live_price:,.2f}" if current_live_price is not None else "Pending Dhan Feed connection"
+            status_text = (
+                "Live feed connected successfully. Ready for manual strategy overlay or screenshot breakdown."
+                if current_live_price is not None
+                else f"Feed source routed to {feed_source}. Connect Dhan API to stream live NSE/MCX price."
+            )
             st.markdown(f"""
             <div class="alert-box">
             <h3>📡 Live Feed Telemetry: {asset_input}</h3>
             <p><b>Market Category:</b> {current_cat_label}</p>
-            <p><b>Current Live Price:</b> ₹ / $ {current_live_price:,.2f}</p>
-            <p><b>Status:</b> Live feed connected successfully. Ready for manual strategy overlay or screenshot breakdown.</p>
+            <p><b>Feed Provider:</b> {feed_source}</p>
+            <p><b>Current Live Price:</b> {price_text}</p>
+            <p><b>Status:</b> {status_text}</p>
             </div>
             """, unsafe_allow_html=True)
 
