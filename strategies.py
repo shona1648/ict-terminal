@@ -49,6 +49,27 @@ STRATEGY_2_CONFIG = {
     },
 }
 
+STRATEGY_3_CONFIG = {
+    "id": "STRAT_03",
+    "name": "Power of 3 (AMD)",
+    "markets": ["NSE", "Crypto"],
+    "pending_markets": ["MCX"],
+    "styles": ["Intraday", "Swing"],
+    "use_killzone": False,
+    "timeframes": {
+        "NSE": {
+            "Intraday": ["3m", "5m", "15m"],
+            "Swing": ["15m", "1h", "4h", "1d"],
+            "HTF_POI": ["4h", "1d", "1w"],
+        },
+        "Crypto": {
+            "Intraday": ["15m", "30m", "1h"],
+            "Swing": ["1h", "4h", "1d"],
+            "HTF_POI": ["4h", "1d", "1w"],
+        },
+    },
+}
+
 NSE_INDEX_SYMBOLS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "^NSEI", "^NSEBANK", "^CNXFIN", "^BSESN"}
 
 
@@ -67,10 +88,9 @@ def _in_window(now_t, start_t, end_t):
     return now_t >= start_t or now_t <= end_t
 
 
-def check_session_and_killzone(market, style, now_dt=None):
+def check_market_open_hours(market, now_dt=None):
     """
-    Market hours aur Intraday Killzone alignment check (IST).
-    Swing mode mein Killzone bypass rehta hai, par active market hours check honge.
+    Active market hours check (IST) without killzone filtering.
     """
     if market in PENDING_MARKETS:
         return False, f"{market} Pending"
@@ -83,6 +103,27 @@ def check_session_and_killzone(market, style, now_dt=None):
             return False, "NSE Weekend Closed"
         if not _in_window(t, dt_time(9, 15), dt_time(15, 30)):
             return False, "Outside NSE Hours"
+        return True, "NSE Active Hours"
+
+    if market == "Crypto":
+        return True, "Crypto 24/7 Active"
+
+    return False, "Unsupported Market"
+
+
+def check_session_and_killzone(market, style, now_dt=None):
+    """
+    Market hours aur Intraday Killzone alignment check (IST).
+    Swing mode mein Killzone bypass rehta hai, par active market hours check honge.
+    """
+    allowed_hours, reason = check_market_open_hours(market, now_dt)
+    if not allowed_hours:
+        return False, reason
+
+    now_dt = now_dt or get_ist_now()
+    t = now_dt.time()
+
+    if market == "NSE":
         return True, "NSE Active Hours"
 
     if market == "Crypto":
@@ -103,24 +144,23 @@ def check_silver_bullet_window(market, now_dt=None):
     Strategy #2: Killzone + 60-minute Interbank Delivery Window check (IST).
     NSE mein London/NY Killzone bypass karke NSE Silver Bullet windows check hote hain.
     """
-    if market in PENDING_MARKETS:
-        return False, f"{market} Pending"
+    allowed_hours, reason = check_market_open_hours(market, now_dt)
+    if not allowed_hours:
+        return False, reason
 
     now_dt = now_dt or get_ist_now()
     t = now_dt.time()
 
     if market == "NSE":
-        if now_dt.weekday() >= 5:
-            return False, "NSE Weekend Closed"
         for start_t, end_t in STRATEGY_2_CONFIG["delivery_windows_ist"]["NSE"]:
             if _in_window(t, start_t, end_t):
                 return True, "NSE Silver Bullet Delivery Window"
         return False, "Outside NSE Silver Bullet Window"
 
     if market == "Crypto":
-        allowed_kz, reason = check_session_and_killzone("Crypto", "Intraday", now_dt)
+        allowed_kz, kz_reason = check_session_and_killzone("Crypto", "Intraday", now_dt)
         if not allowed_kz:
-            return False, reason
+            return False, kz_reason
         for start_t, end_t in STRATEGY_2_CONFIG["delivery_windows_ist"]["Crypto"]:
             if _in_window(t, start_t, end_t):
                 return True, "Crypto Silver Bullet Delivery Window"
@@ -172,6 +212,46 @@ def check_htf_bias(candles_by_tf):
         return "BULLISH"
     if second_half_low < first_half_low and second_half_high <= first_half_high and last_close < recent[-3]["close"]:
         return "BEARISH"
+    return "NEUTRAL"
+
+
+def check_htf_poi_bias(candles_by_tf, live_price):
+    """
+    Strategy #3 Swing mode ke liye 4H / 1D / 1W HTF POI (OB / FVG / Major Swing) confluence check.
+    Returns: 'BULLISH', 'BEARISH', or 'NEUTRAL'
+    """
+    for htf in ("4h", "1d", "1w"):
+        htf_candles = candles_by_tf.get(htf) or []
+        if len(htf_candles) < 8:
+            continue
+
+        atr_htf = calc_atr(htf_candles, min(14, len(htf_candles) - 1))
+        recent = htf_candles[-8:]
+
+        # Bullish HTF POI (FVG or bullish impulse base near current price)
+        for i in range(2, len(recent)):
+            c0, c1, c2 = recent[i - 2], recent[i - 1], recent[i]
+            if c0["high"] < c2["low"] and (c1["close"] - c1["open"]) > atr_htf * 0.4:
+                poi_low, poi_high = c0["high"], max(c2["low"], c1["close"])
+                if live_price >= poi_low - (0.5 * atr_htf) and live_price <= poi_high + (0.5 * atr_htf):
+                    return "BULLISH"
+
+        # Bearish HTF POI (FVG or bearish impulse supply near current price)
+        for i in range(2, len(recent)):
+            c0, c1, c2 = recent[i - 2], recent[i - 1], recent[i]
+            if c0["low"] > c2["high"] and (c1["open"] - c1["close"]) > atr_htf * 0.4:
+                poi_high, poi_low = c0["low"], min(c2["high"], c1["close"])
+                if live_price >= poi_low - (0.5 * atr_htf) and live_price <= poi_high + (0.5 * atr_htf):
+                    return "BEARISH"
+
+        # Major swing level reaction fallback
+        swing_low = min(c["low"] for c in recent[:-1])
+        swing_high = max(c["high"] for c in recent[:-1])
+        if abs(live_price - swing_low) <= atr_htf * 0.6 and recent[-1]["close"] >= swing_low:
+            return "BULLISH"
+        if abs(live_price - swing_high) <= atr_htf * 0.6 and recent[-1]["close"] <= swing_high:
+            return "BEARISH"
+
     return "NEUTRAL"
 
 
@@ -559,6 +639,225 @@ def evaluate_silver_bullet_tf(symbol, market, tf, candles, live_price, now_dt=No
 
 
 # ==============================================================================
+# STRATEGY #3: POWER OF 3 — AMD (INTRADAY & HTF POI SWING)
+# ==============================================================================
+def evaluate_po3_amd_tf(symbol, market, style, tf, candles, live_price, htf_poi_bias="NEUTRAL", now_dt=None):
+    """
+    Isolated single-timeframe state evaluation for Power of 3 (AMD) Setup (LONG & SHORT).
+    Intraday: standalone AMD cycle (No killzone filter).
+    Swing: requires HTF POI confluence (4H / 1D / 1W).
+    """
+    if not candles or len(candles) < 35:
+        return []
+
+    if style == "Swing" and htf_poi_bias == "NEUTRAL":
+        return []
+
+    now_str = format_ist_timestamp(now_dt)
+    setups = []
+    atr = calc_atr(candles, 14)
+    base_vol = avg_volume(candles[:-1], 20)
+    is_nse_index = market == "NSE" and symbol.upper() in NSE_INDEX_SYMBOLS
+    vol_available = base_vol > 0 and not is_nse_index
+
+    lookback = candles[-30:]
+    curr = lookback[-1]
+    prev = lookback[-2]
+
+    # ---------------- LONG ENTRY LOGIC (BULLISH POWER OF 3 — AMD) ----------------
+    if style == "Intraday" or htf_poi_bias == "BULLISH":
+        # Phase 1: Tight horizontal Accumulation box with compressed volume (CP1)
+        for box_start in range(len(lookback) - 14, len(lookback) - 7):
+            if box_start < 2:
+                continue
+            acc_candles = lookback[box_start : box_start + 4]
+            acc_high = max(c["high"] for c in acc_candles)
+            acc_low = min(c["low"] for c in acc_candles)
+            acc_range = acc_high - acc_low
+
+            if acc_range <= 0 or acc_range > atr * 1.4:
+                continue
+
+            acc_vols = [c.get("volume", 0) or 0 for c in acc_candles]
+            acc_avg_vol = (sum(acc_vols) / len(acc_vols)) if acc_vols else 0.0
+            cp1_ok = (not vol_available) or (acc_avg_vol <= base_vol * 1.05)
+
+            post_acc = lookback[box_start + 4 :]
+            if len(post_acc) < 3 or not cp1_ok:
+                continue
+
+            # Phase 2: Bearish Judas Swing trap below accumulation_low + CP2 spike
+            trap_candidates = post_acc[:-1]
+            judas_candle = min(trap_candidates, key=lambda c: c["low"])
+            judas_low = judas_candle["low"]
+            judas_idx = post_acc.index(judas_candle)
+
+            if judas_low < acc_low:
+                cp2_trap_ok = (not vol_available) or (judas_candle.get("volume", 0) >= base_vol * 1.1)
+
+                # Phase 3: Bullish Displaced MSS above accumulation_high / prior swing + FVG/OB
+                after_judas = post_acc[judas_idx + 1 :]
+                mss_target = max(acc_high, max(c["high"] for c in lookback[box_start : box_start + 4 + judas_idx]))
+                disp_high = max((c["high"] for c in after_judas), default=0)
+                mss_broken = any(c["close"] > mss_target for c in after_judas)
+
+                poi_zone = None
+                cp2_disp_ok = False
+                for i in range(len(after_judas)):
+                    c_item = after_judas[i]
+                    if (c_item["close"] - c_item["open"]) > atr * 0.5:
+                        if (not vol_available) or (c_item.get("volume", 0) >= base_vol * 1.15):
+                            cp2_disp_ok = True
+                        if i >= 2:
+                            c0, c1, c2 = after_judas[i - 2], after_judas[i - 1], after_judas[i]
+                            if c0["high"] < c2["low"]:
+                                poi_zone = (c0["high"], c2["low"])
+                                break
+                        if poi_zone is None:
+                            # Bullish Order Block fallback (last bearish/down candle before displacement)
+                            poi_zone = (c_item["low"], max(c_item["open"], c_item["close"]))
+                            break
+
+                if cp2_trap_ok and mss_broken and poi_zone and cp2_disp_ok and disp_high > judas_low:
+                    zone_low, zone_high = min(poi_zone), max(poi_zone)
+                    invalidated = any(c["low"] < judas_low for c in after_judas[-3:]) or live_price < judas_low
+
+                    in_pullback = (prev["low"] <= zone_high and prev["close"] >= zone_low) or (
+                        curr["low"] <= zone_high and curr["close"] >= zone_low
+                    )
+                    cp3_ok = (not vol_available) or (prev.get("volume", 0) <= base_vol * 1.35)
+                    bullish_confirm = curr["close"] > curr["open"] and curr["low"] <= zone_high
+
+                    if not invalidated and in_pullback and cp3_ok and bullish_confirm and live_price > curr["high"]:
+                        entry = float(live_price)
+                        sl = float(judas_low - (0.15 * atr))
+                        risk = entry - sl
+                        if risk > 0:
+                            tp1 = float(max(acc_high, disp_high))
+                            tp2 = float(max(tp1 + risk, entry + (2.2 * risk)))
+                            rr = (tp2 - entry) / risk
+                            if rr >= 2.0:
+                                be_price = float(entry + risk)
+                                setups.append({
+                                    "trade_id": f"STRAT03_{symbol}_{market}_{style}_{tf}_LONG_{curr.get('time', '')}",
+                                    "symbol": symbol,
+                                    "market": market,
+                                    "strategy": STRATEGY_3_CONFIG["name"],
+                                    "direction": "LONG",
+                                    "style": style,
+                                    "timeframe": tf,
+                                    "entry": round(entry, 4),
+                                    "entry_time": now_str,
+                                    "sl": round(sl, 4),
+                                    "active_sl": round(sl, 4),
+                                    "be_trigger": round(be_price, 4),
+                                    "tp1": round(tp1, 4),
+                                    "tp2": round(tp2, 4),
+                                    "rr": round(rr, 2),
+                                    "be_hit": False,
+                                    "tp1_hit": False,
+                                    "status": "OPEN",
+                                })
+                        break
+
+    # ---------------- SHORT SELL LOGIC (BEARISH POWER OF 3 — AMD) ----------------
+    if style == "Intraday" or htf_poi_bias == "BEARISH":
+        for box_start in range(len(lookback) - 14, len(lookback) - 7):
+            if box_start < 2:
+                continue
+            acc_candles = lookback[box_start : box_start + 4]
+            acc_high = max(c["high"] for c in acc_candles)
+            acc_low = min(c["low"] for c in acc_candles)
+            acc_range = acc_high - acc_low
+
+            if acc_range <= 0 or acc_range > atr * 1.4:
+                continue
+
+            acc_vols = [c.get("volume", 0) or 0 for c in acc_candles]
+            acc_avg_vol = (sum(acc_vols) / len(acc_vols)) if acc_vols else 0.0
+            cp1_ok = (not vol_available) or (acc_avg_vol <= base_vol * 1.05)
+
+            post_acc = lookback[box_start + 4 :]
+            if len(post_acc) < 3 or not cp1_ok:
+                continue
+
+            # Phase 2: Bullish Judas Swing trap above accumulation_high + CP2 spike
+            trap_candidates = post_acc[:-1]
+            judas_candle = max(trap_candidates, key=lambda c: c["high"])
+            judas_high = judas_candle["high"]
+            judas_idx = post_acc.index(judas_candle)
+
+            if judas_high > acc_high:
+                cp2_trap_ok = (not vol_available) or (judas_candle.get("volume", 0) >= base_vol * 1.1)
+
+                # Phase 3: Bearish Displaced MSS below accumulation_low / prior swing + FVG/OB
+                after_judas = post_acc[judas_idx + 1 :]
+                mss_target = min(acc_low, min(c["low"] for c in lookback[box_start : box_start + 4 + judas_idx]))
+                disp_low = min((c["low"] for c in after_judas), default=0)
+                mss_broken = any(c["close"] < mss_target for c in after_judas)
+
+                poi_zone = None
+                cp2_disp_ok = False
+                for i in range(len(after_judas)):
+                    c_item = after_judas[i]
+                    if (c_item["open"] - c_item["close"]) > atr * 0.5:
+                        if (not vol_available) or (c_item.get("volume", 0) >= base_vol * 1.15):
+                            cp2_disp_ok = True
+                        if i >= 2:
+                            c0, c1, c2 = after_judas[i - 2], after_judas[i - 1], after_judas[i]
+                            if c0["low"] > c2["high"]:
+                                poi_zone = (c2["high"], c0["low"])
+                                break
+                        if poi_zone is None:
+                            poi_zone = (min(c_item["open"], c_item["close"]), c_item["high"])
+                            break
+
+                if cp2_trap_ok and mss_broken and poi_zone and cp2_disp_ok and judas_high > disp_low:
+                    zone_low, zone_high = min(poi_zone), max(poi_zone)
+                    invalidated = any(c["high"] > judas_high for c in after_judas[-3:]) or live_price > judas_high
+
+                    in_pullback = (prev["high"] >= zone_low and prev["close"] <= zone_high) or (
+                        curr["high"] >= zone_low and curr["close"] <= zone_high
+                    )
+                    cp3_ok = (not vol_available) or (prev.get("volume", 0) <= base_vol * 1.35)
+                    bearish_confirm = curr["close"] < curr["open"] and curr["high"] >= zone_low
+
+                    if not invalidated and in_pullback and cp3_ok and bearish_confirm and live_price < curr["low"]:
+                        entry = float(live_price)
+                        sl = float(judas_high + (0.15 * atr))
+                        risk = sl - entry
+                        if risk > 0:
+                            tp1 = float(min(acc_low, disp_low))
+                            tp2 = float(min(tp1 - risk, entry - (2.2 * risk)))
+                            rr = (entry - tp2) / risk
+                            if rr >= 2.0:
+                                be_price = float(entry - risk)
+                                setups.append({
+                                    "trade_id": f"STRAT03_{symbol}_{market}_{style}_{tf}_SHORT_{curr.get('time', '')}",
+                                    "symbol": symbol,
+                                    "market": market,
+                                    "strategy": STRATEGY_3_CONFIG["name"],
+                                    "direction": "SHORT",
+                                    "style": style,
+                                    "timeframe": tf,
+                                    "entry": round(entry, 4),
+                                    "entry_time": now_str,
+                                    "sl": round(sl, 4),
+                                    "active_sl": round(sl, 4),
+                                    "be_trigger": round(be_price, 4),
+                                    "tp1": round(tp1, 4),
+                                    "tp2": round(tp2, 4),
+                                    "rr": round(rr, 2),
+                                    "be_hit": False,
+                                    "tp1_hit": False,
+                                    "status": "OPEN",
+                                })
+                        break
+
+    return setups
+
+
+# ==============================================================================
 # LIVE TRADE MANAGEMENT (BE@1:1, TP1, TP2, SL WITH IST TIMESTAMPS)
 # ==============================================================================
 def process_live_trade_updates(active_trades, current_prices, now_dt=None):
@@ -719,6 +1018,26 @@ def evaluate_strategies_detailed(symbol, market, price, candles_by_tf=None):
                 now_dt=now_dt,
             )
             setups.extend(matches)
+
+    # --- Strategy #3: Power of 3 — AMD (Intraday + HTF POI Swing, No Killzone) ---
+    hours_ok, _ = check_market_open_hours(market, now_dt)
+    if hours_ok:
+        s3_tfs = STRATEGY_3_CONFIG["timeframes"].get(market, {})
+        for style in ("Intraday", "Swing"):
+            htf_poi_bias = check_htf_poi_bias(candles_by_tf, price) if style == "Swing" else "NEUTRAL"
+            for tf in s3_tfs.get(style, []):
+                tf_candles = candles_by_tf.get(tf) or []
+                matches = evaluate_po3_amd_tf(
+                    symbol=symbol,
+                    market=market,
+                    style=style,
+                    tf=tf,
+                    candles=tf_candles,
+                    live_price=price,
+                    htf_poi_bias=htf_poi_bias,
+                    now_dt=now_dt,
+                )
+                setups.extend(matches)
 
     for m in setups:
         label = (
