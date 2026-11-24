@@ -27,7 +27,7 @@ if 'crypto_watchlist' not in st.session_state:
 if 'mcx_watchlist' not in st.session_state:
     st.session_state.mcx_watchlist = ["CRUDEOIL", "GOLD", "SILVER", "NATURALGAS"]
 
-# --- CRYPTO, NSE & COMMODITIES (YAHOO FINANCE) ENGINE ---
+# --- CRYPTO & NSE (YAHOO FINANCE) + INDIAN MCX (PENDING) ENGINE ---
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{}"
 YAHOO_HEADERS = {"User-Agent": "Mozilla/5.0"}
 
@@ -41,27 +41,16 @@ NSE_INDEX_TICKERS = {
     "SENSEX": "^BSESN",
 }
 
-# Yahoo Finance front-month global futures mapping (Indian MCX INR direct feed is not available on Yahoo)
-COMMODITY_YAHOO_TICKERS = {
-    "CRUDEOIL": "CL=F",
-    "CRUDE": "CL=F",
-    "GOLD": "GC=F",
-    "SILVER": "SI=F",
-    "NATURALGAS": "NG=F",
-    "NATGAS": "NG=F",
-    "COPPER": "HG=F",
-}
-
 
 def get_currency_symbol(market_type):
-    if "NSE" in market_type:
+    if "NSE" in market_type or "MCX" in market_type:
         return "₹"
     return "$"
 
 
 def format_price(price, market_type):
     if price is None:
-        return "Feed unavailable for this market"
+        return "Pending Indian MCX Feed (₹0 feed unavailable)"
     curr = get_currency_symbol(market_type)
     return f"{curr}{price:,.2f}"
 
@@ -70,7 +59,7 @@ def get_feed_provider(market_type):
     if "Crypto" in market_type or "NSE" in market_type:
         return "Yahoo Finance"
     if "MCX" in market_type:
-        return "Yahoo Finance (Global Futures USD)"
+        return "Indian MCX Feed (Pending)"
     return "Unknown Feed"
 
 
@@ -92,17 +81,6 @@ def resolve_nse_yahoo_ticker(symbol):
     if sym.startswith("^") or sym.endswith(".NS") or sym.endswith(".BO"):
         return sym
     return f"{sym}.NS"
-
-
-def resolve_mcx_yahoo_ticker(symbol):
-    sym = symbol.strip().upper()
-    if not sym:
-        return None
-    if sym in COMMODITY_YAHOO_TICKERS:
-        return COMMODITY_YAHOO_TICKERS[sym]
-    if sym.endswith("=F"):
-        return sym
-    return None
 
 
 def fetch_yahoo_chart_result(ticker, timeout=6):
@@ -148,15 +126,9 @@ def get_nse_price_yahoo(symbol):
     return get_yahoo_price(ticker), ticker
 
 
-def get_mcx_price_yahoo(symbol):
+def get_mcx_price_indian(symbol):
     sym = symbol.strip().upper()
-    ticker = resolve_mcx_yahoo_ticker(sym)
-    if not ticker:
-        return None, f"{sym} (No Yahoo futures ticker mapped)"
-    price = get_yahoo_price(ticker)
-    if price is None:
-        return None, f"{ticker} (Price unavailable on Yahoo Finance)"
-    return price, f"{ticker} (USD Global Fut)"
+    return None, f"{sym} (Indian MCX INR feed not available on ₹0 Yahoo Finance)"
 
 
 def get_live_price(symbol, market_type):
@@ -165,7 +137,7 @@ def get_live_price(symbol, market_type):
     if "NSE" in market_type:
         return get_nse_price_yahoo(symbol)
     if "MCX" in market_type:
-        return get_mcx_price_yahoo(symbol)
+        return get_mcx_price_indian(symbol)
     return None, "Unsupported market"
 
 
@@ -192,11 +164,7 @@ def verify_mcx_symbol(symbol):
         sym = "CRUDEOIL"
     if not sym:
         return False, sym
-    ticker = resolve_mcx_yahoo_ticker(sym)
-    if not ticker:
-        return False, sym
-    price = get_yahoo_price(ticker)
-    return (price is not None), sym
+    return True, sym
 
 
 # ==================== SIDEBAR CONTROLS ====================
@@ -263,7 +231,7 @@ elif selected_market.startswith("Crypto"):
             st.sidebar.warning("⚠️ Keep at least 1 symbol!")
 
 else:
-    st.sidebar.markdown("**🛢️ MCX Watchlist (Yahoo Global Fut)**")
+    st.sidebar.markdown("**🛢️ MCX Watchlist (Indian MCX Pending)**")
     new_mcx = st.sidebar.text_input("Add Symbol", key="input_mcx_box", placeholder="e.g. CRUDEOIL, GOLD, SILVER, NATURALGAS")
     if st.sidebar.button("➕ Add to Watchlist", key="btn_add_mcx_symbol"):
         if new_mcx:
@@ -276,7 +244,7 @@ else:
                     st.sidebar.success(f"✅ Added {verified_sym}!")
                     st.rerun()
             else:
-                st.sidebar.error("❌ Invalid or unverified commodity ticker on Yahoo Finance!")
+                st.sidebar.error("❌ Invalid MCX commodity!")
 
     selected_mcx_item = st.sidebar.selectbox("📋 Watchlist Box", st.session_state.mcx_watchlist, key="sel_mcx_box")
     if st.sidebar.button("❌ Remove Selected Symbol", key="btn_rem_mcx"):
@@ -325,43 +293,37 @@ with tab1:
     elif "MCX" in scan_target_category:
         active_pool = [(s, "MCX Commodities") for s in st.session_state.mcx_watchlist]
 
-    asset_labels = [f"{sym} ({cat.split()[0]})" for sym, cat in active_pool]
-    if asset_labels:
-        chosen_label = st.selectbox("📌 Active Instrument to Monitor", asset_labels, key="active_monitor_asset")
-        asset_input, current_cat_label = active_pool[asset_labels.index(chosen_label)]
-    else:
-        asset_input, current_cat_label = "NIFTY", "NSE (Equity Cash & F&O)"
+    pool_preview = ", ".join([sym for sym, _ in active_pool]) if active_pool else "None"
+    st.info(f"📋 **Target Scan Category:** `{scan_target_category}` | **Watchlist Pool ({len(active_pool)}):** `{pool_preview}`")
 
-    st.info(f"📋 **Active Scan Category:** `{scan_target_category}` | **Monitoring Asset:** `{asset_input}`")
-
-    feed_source = get_feed_provider(current_cat_label)
-    current_live_price, resolved_ticker = get_live_price(asset_input, current_cat_label)
-
-    if current_live_price is not None:
-        st.caption(f"📡 **Live Market Feed ({resolved_ticker} • {feed_source}):** {format_price(current_live_price, current_cat_label)}")
-    else:
-        st.caption(f"📡 **Live Market Feed ({asset_input} • {feed_source}):** {resolved_ticker}")
+    if active_pool:
+        lead_sym, lead_cat = active_pool[0]
+        lead_price, lead_ticker = get_live_price(lead_sym, lead_cat)
+        lead_feed = get_feed_provider(lead_cat)
+        if lead_price is not None:
+            st.caption(f"📡 **Lead Watchlist Feed ({lead_sym} • {lead_ticker} • {lead_feed}):** {format_price(lead_price, lead_cat)}")
+        else:
+            st.caption(f"📡 **Lead Watchlist Feed ({lead_sym} • {lead_feed}):** {lead_ticker}")
 
     if st.button("Run Live Price Feed Analysis", key="btn_run_institutional_scan"):
-        with st.spinner(f"Fetching live data & processing structure for {asset_input}..."):
-            price_text = format_price(current_live_price, current_cat_label)
-            status_text = (
-                f"Live feed connected via Yahoo Finance ({resolved_ticker}). Note: Commodities show global front-month futures (USD), not Indian MCX INR contracts."
-                if (current_live_price is not None and "MCX" in current_cat_label)
-                else (
-                    f"Live feed connected via Yahoo Finance ({resolved_ticker}). Ready for manual strategy overlay or screenshot breakdown."
-                    if current_live_price is not None
-                    else f"Status: {resolved_ticker}"
+        with st.spinner(f"Scanning {len(active_pool)} watchlist instrument(s) across {scan_target_category}..."):
+            rows_html = ""
+            for sym, cat in active_pool:
+                px, r_ticker = get_live_price(sym, cat)
+                provider = get_feed_provider(cat)
+                px_str = format_price(px, cat)
+                rows_html += (
+                    f"<p><b>{sym}</b> ({cat.split()[0]}) • <code>{r_ticker}</code> • "
+                    f"<i>{provider}</i> → <b>{px_str}</b></p>"
                 )
-            )
+
             st.markdown(f"""
             <div class="alert-box">
-            <h3>📡 Live Feed Telemetry: {asset_input}</h3>
-            <p><b>Market Category:</b> {current_cat_label}</p>
-            <p><b>Feed Provider:</b> {feed_source}</p>
-            <p><b>Resolved Ticker:</b> {resolved_ticker}</p>
-            <p><b>Current Live Price:</b> {price_text}</p>
-            <p><b>Status:</b> {status_text}</p>
+            <h3>📡 Watchlist Scan Telemetry ({scan_target_category})</h3>
+            <p><b>Scan Mode:</b> {scan_mode}</p>
+            <p><b>Total Instruments in Pool:</b> {len(active_pool)}</p>
+            <hr style="border-color: #2a2e39;">
+            {rows_html}
             </div>
             """, unsafe_allow_html=True)
 
