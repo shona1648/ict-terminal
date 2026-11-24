@@ -112,6 +112,27 @@ STRATEGY_5_CONFIG = {
     },
 }
 
+STRATEGY_6_CONFIG = {
+    "id": "STRAT_06",
+    "name": "Liquidity Sweep & Reversal Model",
+    "markets": ["NSE", "Crypto"],
+    "pending_markets": ["MCX"],
+    "styles": ["Intraday", "Swing"],
+    "use_killzone": False,
+    "timeframes": {
+        "NSE": {
+            "Intraday": ["3m", "5m", "15m"],
+            "Swing": ["1h", "4h", "1d"],
+            "HTF_POOLS": ["1d", "1w"],
+        },
+        "Crypto": {
+            "Intraday": ["15m", "30m", "1h"],
+            "Swing": ["1h", "4h", "1d"],
+            "HTF_POOLS": ["1d", "1w"],
+        },
+    },
+}
+
 NSE_INDEX_SYMBOLS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "^NSEI", "^NSEBANK", "^CNXFIN", "^BSESN"}
 
 
@@ -327,6 +348,21 @@ def _has_institutional_reference_confluence(symbol, market, zone_low, zone_high,
     if abs(mid_price - nearest_lower) <= tolerance or abs(mid_price - nearest_upper) <= tolerance:
         return True
     return False
+
+
+def _extract_anchor_liquidity(lookback, style):
+    """
+    Strategy #6: Isolated timeframe-local anchor liquidity levels (PDH/PDL or PWH/PWL
+    approximated from prior session/period block + swing pools) without cross-TF state.
+    """
+    if len(lookback) < 12:
+        return None, None
+    prior_block = lookback[:-8] if style == "Intraday" else lookback[:-10]
+    if not prior_block:
+        return None, None
+    anchor_high = max(c["high"] for c in prior_block)
+    anchor_low = min(c["low"] for c in prior_block)
+    return anchor_high, anchor_low
 
 
 def _find_swing_lows(candles, left=2, right=2):
@@ -1179,7 +1215,6 @@ def evaluate_ob_retest_tf(symbol, market, style, tf, candles, live_price, htf_po
                 disp_high = max((c["high"] for c in after_sweep), default=0)
                 mss_broken = any(c["close"] > mss_target for c in after_sweep)
 
-                # Bullish OB: last down-close candle before strong bullish displacement leg
                 bull_ob = None
                 cp1_ok = False
                 for i in range(len(after_sweep)):
@@ -1197,17 +1232,13 @@ def evaluate_ob_retest_tf(symbol, market, style, tf, candles, live_price, htf_po
                     ob_low, ob_high = bull_ob
                     ob_mean_50 = (ob_low + ob_high) / 2.0
 
-                    # Step 1: OB must sit in Discount zone (< 50% dealing range equilibrium)
                     in_discount = ob_mean_50 <= eq_50
-                    # Step 3: Institutional Reference Number confluence
                     inst_ref_ok = _has_institutional_reference_confluence(symbol, market, ob_low, ob_high, atr)
 
-                    # Invalidation: candle body closes below OB 50% mean or price breaks below ob_low
                     body_broke_mean = any(c["close"] < ob_mean_50 for c in after_sweep[-3:]) or (curr["close"] < ob_mean_50)
                     broke_ob_low = any(c["low"] < ob_low for c in after_sweep[-3:]) or (live_price < ob_low)
                     invalidated = body_broke_mean or broke_ob_low
 
-                    # CP2 & CP3: Controlled volume on retracement and OB retest reaction
                     cp2_ok = (not vol_available) or (prev.get("volume", 0) <= base_vol * 1.35)
                     cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
 
@@ -1274,7 +1305,6 @@ def evaluate_ob_retest_tf(symbol, market, style, tf, candles, live_price, htf_po
                 disp_low = min((c["low"] for c in after_sweep), default=0)
                 mss_broken = any(c["close"] < mss_target for c in after_sweep)
 
-                # Bearish OB: last up-close candle before strong bearish displacement leg
                 bear_ob = None
                 cp1_ok = False
                 for i in range(len(after_sweep)):
@@ -1292,17 +1322,13 @@ def evaluate_ob_retest_tf(symbol, market, style, tf, candles, live_price, htf_po
                     ob_low, ob_high = bear_ob
                     ob_mean_50 = (ob_low + ob_high) / 2.0
 
-                    # Step 1: OB must sit in Premium zone (> 50% dealing range equilibrium)
                     in_premium = ob_mean_50 >= eq_50
-                    # Step 3: Institutional Reference Number confluence
                     inst_ref_ok = _has_institutional_reference_confluence(symbol, market, ob_low, ob_high, atr)
 
-                    # Invalidation: candle body closes above OB 50% mean or price breaks above ob_high
                     body_broke_mean = any(c["close"] > ob_mean_50 for c in after_sweep[-3:]) or (curr["close"] > ob_mean_50)
                     broke_ob_high = any(c["high"] > ob_high for c in after_sweep[-3:]) or (live_price > ob_high)
                     invalidated = body_broke_mean or broke_ob_high
 
-                    # CP2 & CP3: Controlled volume on retracement and OB retest reaction
                     cp2_ok = (not vol_available) or (prev.get("volume", 0) <= base_vol * 1.35)
                     cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
 
@@ -1335,6 +1361,222 @@ def evaluate_ob_retest_tf(symbol, market, style, tf, candles, live_price, htf_po
                                     "symbol": symbol,
                                     "market": market,
                                     "strategy": STRATEGY_5_CONFIG["name"],
+                                    "direction": "SHORT",
+                                    "style": style,
+                                    "timeframe": tf,
+                                    "entry": round(entry, 4),
+                                    "entry_time": now_str,
+                                    "sl": round(sl, 4),
+                                    "active_sl": round(sl, 4),
+                                    "be_trigger": round(be_price, 4),
+                                    "tp1": round(tp1, 4),
+                                    "tp2": round(tp2, 4),
+                                    "rr": round(rr, 2),
+                                    "be_hit": False,
+                                    "tp1_hit": False,
+                                    "status": "OPEN",
+                                })
+
+    return setups
+
+
+# ==============================================================================
+# STRATEGY #6: LIQUIDITY SWEEP & REVERSAL MODEL (ISOLATED MULTI-TF STATE)
+# ==============================================================================
+def evaluate_liquidity_sweep_reversal_tf(symbol, market, style, tf, candles, live_price, htf_bias="NEUTRAL", now_dt=None):
+    """
+    Isolated single-timeframe state evaluation for Liquidity Sweep & Reversal Model.
+    Uses timeframe-local anchor liquidity (PDH/PDL or PWH/PWL proxy + swing highs/lows),
+    3 volume checkpoints (no volume filter on live entry break), Displaced MSS, FVG/OB pullback,
+    and LONG / SHORT support across Intraday and Swing. No killzone filter.
+    """
+    if not candles or len(candles) < 35:
+        return []
+
+    if style == "Swing" and htf_bias == "NEUTRAL":
+        return []
+
+    now_str = format_ist_timestamp(now_dt)
+    setups = []
+    atr = calc_atr(candles, 14)
+    base_vol = avg_volume(candles[:-1], 20)
+    is_nse_index = market == "NSE" and symbol.upper() in NSE_INDEX_SYMBOLS
+    vol_available = base_vol > 0 and not is_nse_index
+
+    lookback = candles[-34:]
+    curr = lookback[-1]
+    prev = lookback[-2]
+
+    anchor_high, anchor_low = _extract_anchor_liquidity(lookback, style)
+    range_high = max(c["high"] for c in lookback[:-2])
+    range_low = min(c["low"] for c in lookback[:-2])
+    eq_50 = (range_high + range_low) / 2.0
+
+    swing_lows = _find_swing_lows(lookback[:-4], 2, 2)
+    swing_highs = _find_swing_highs(lookback[:-4], 2, 2)
+
+    # ---------------- LONG ENTRY LOGIC (SSL SWEEP & BULLISH REVERSAL) ----------------
+    if (style == "Intraday" or htf_bias == "BULLISH") and swing_lows and swing_highs:
+        ssl_idx, ssl_swing = swing_lows[-1]
+        ssl_level = min(ssl_swing, anchor_low) if anchor_low is not None else ssl_swing
+        post_ssl = lookback[ssl_idx + 1 :]
+
+        if len(post_ssl) >= 4:
+            # CP1: Controlled / non-climactic volume during pre-sweep liquidity build
+            pre_start = max(0, ssl_idx - 4)
+            pre_candles = lookback[pre_start : ssl_idx + 1]
+            pre_vols = [c.get("volume", 0) or 0 for c in pre_candles]
+            pre_avg_vol = (sum(pre_vols) / len(pre_vols)) if pre_vols else 0.0
+            cp1_ok = (not vol_available) or (pre_avg_vol <= base_vol * 1.25)
+
+            # Step 2: Sweep below key SSL level + CP2 volume spike
+            sweep_candle = min(post_ssl[:-2], key=lambda c: c["low"])
+            sweep_low = sweep_candle["low"]
+            sweep_idx = post_ssl.index(sweep_candle)
+
+            if sweep_low < ssl_level and cp1_ok:
+                cp2_sweep_ok = (not vol_available) or (sweep_candle.get("volume", 0) >= base_vol * 1.1)
+
+                # Step 3: Bullish Displaced MSS + FVG / OB creation + CP2 expanding volume
+                after_sweep = post_ssl[sweep_idx + 1 :]
+                prior_highs = [h for idx, h in swing_highs if idx <= ssl_idx + sweep_idx]
+                mss_target = prior_highs[-1] if prior_highs else max(c["high"] for c in lookback[: ssl_idx + 1])
+
+                disp_high = max((c["high"] for c in after_sweep), default=0)
+                mss_broken = any(c["close"] > mss_target for c in after_sweep)
+
+                rev_zone = None
+                cp2_disp_ok = False
+                for i in range(len(after_sweep)):
+                    c_item = after_sweep[i]
+                    if (c_item["close"] - c_item["open"]) > atr * 0.55:
+                        if (not vol_available) or (c_item.get("volume", 0) >= base_vol * 1.15):
+                            cp2_disp_ok = True
+                        if i >= 2:
+                            c0, c1, c2 = after_sweep[i - 2], after_sweep[i - 1], after_sweep[i]
+                            if c0["high"] < c2["low"]:
+                                rev_zone = (c0["high"], c2["low"])
+                                break
+                        if rev_zone is None:
+                            rev_zone = (c_item["low"], max(c_item["open"], c_item["close"]))
+                            break
+
+                if cp2_sweep_ok and mss_broken and rev_zone and cp2_disp_ok and disp_high > sweep_low:
+                    zone_low, zone_high = min(rev_zone), max(rev_zone)
+                    invalidated = any(c["low"] < sweep_low for c in after_sweep[-3:]) or live_price < sweep_low
+
+                    # Step 4: Pullback into FVG/OB with CP3 controlled volume + live entry break
+                    in_pullback = (prev["low"] <= zone_high and prev["close"] >= zone_low) or (
+                        curr["low"] <= zone_high and curr["close"] >= zone_low
+                    )
+                    cp3_ok = (not vol_available) or (prev.get("volume", 0) <= base_vol * 1.35)
+                    bullish_confirm = curr["close"] > curr["open"] and curr["low"] <= zone_high
+
+                    if not invalidated and in_pullback and cp3_ok and bullish_confirm and live_price > curr["high"]:
+                        entry = float(live_price)
+                        sl = float(sweep_low - (0.15 * atr))
+                        risk = entry - sl
+                        if risk > 0:
+                            tp1 = float(max(eq_50, disp_high))
+                            opposing_bsl = anchor_high if (anchor_high is not None and anchor_high > tp1) else range_high
+                            tp2 = float(max(opposing_bsl, entry + (2.2 * risk)))
+                            rr = (tp2 - entry) / risk
+                            if rr >= 2.0:
+                                be_price = float(entry + risk)
+                                setups.append({
+                                    "trade_id": f"STRAT06_{symbol}_{market}_{style}_{tf}_LONG_{curr.get('time', '')}",
+                                    "symbol": symbol,
+                                    "market": market,
+                                    "strategy": STRATEGY_6_CONFIG["name"],
+                                    "direction": "LONG",
+                                    "style": style,
+                                    "timeframe": tf,
+                                    "entry": round(entry, 4),
+                                    "entry_time": now_str,
+                                    "sl": round(sl, 4),
+                                    "active_sl": round(sl, 4),
+                                    "be_trigger": round(be_price, 4),
+                                    "tp1": round(tp1, 4),
+                                    "tp2": round(tp2, 4),
+                                    "rr": round(rr, 2),
+                                    "be_hit": False,
+                                    "tp1_hit": False,
+                                    "status": "OPEN",
+                                })
+
+    # ---------------- SHORT SELL LOGIC (BSL SWEEP & BEARISH REVERSAL) ----------------
+    if (style == "Intraday" or htf_bias == "BEARISH") and swing_highs and swing_lows:
+        bsl_idx, bsl_swing = swing_highs[-1]
+        bsl_level = max(bsl_swing, anchor_high) if anchor_high is not None else bsl_swing
+        post_bsl = lookback[bsl_idx + 1 :]
+
+        if len(post_bsl) >= 4:
+            # CP1: Controlled / non-climactic volume during pre-sweep liquidity build
+            pre_start = max(0, bsl_idx - 4)
+            pre_candles = lookback[pre_start : bsl_idx + 1]
+            pre_vols = [c.get("volume", 0) or 0 for c in pre_candles]
+            pre_avg_vol = (sum(pre_vols) / len(pre_vols)) if pre_vols else 0.0
+            cp1_ok = (not vol_available) or (pre_avg_vol <= base_vol * 1.25)
+
+            # Step 2: Sweep above key BSL level + CP2 volume spike
+            sweep_candle = max(post_bsl[:-2], key=lambda c: c["high"])
+            sweep_high = sweep_candle["high"]
+            sweep_idx = post_bsl.index(sweep_candle)
+
+            if sweep_high > bsl_level and cp1_ok:
+                cp2_sweep_ok = (not vol_available) or (sweep_candle.get("volume", 0) >= base_vol * 1.1)
+
+                # Step 3: Bearish Displaced MSS + FVG / OB creation + CP2 expanding volume
+                after_sweep = post_bsl[sweep_idx + 1 :]
+                prior_lows = [l for idx, l in swing_lows if idx <= bsl_idx + sweep_idx]
+                mss_target = prior_lows[-1] if prior_lows else min(c["low"] for c in lookback[: bsl_idx + 1])
+
+                disp_low = min((c["low"] for c in after_sweep), default=0)
+                mss_broken = any(c["close"] < mss_target for c in after_sweep)
+
+                rev_zone = None
+                cp2_disp_ok = False
+                for i in range(len(after_sweep)):
+                    c_item = after_sweep[i]
+                    if (c_item["open"] - c_item["close"]) > atr * 0.55:
+                        if (not vol_available) or (c_item.get("volume", 0) >= base_vol * 1.15):
+                            cp2_disp_ok = True
+                        if i >= 2:
+                            c0, c1, c2 = after_sweep[i - 2], after_sweep[i - 1], after_sweep[i]
+                            if c0["low"] > c2["high"]:
+                                rev_zone = (c2["high"], c0["low"])
+                                break
+                        if rev_zone is None:
+                            rev_zone = (min(c_item["open"], c_item["close"]), c_item["high"])
+                            break
+
+                if cp2_sweep_ok and mss_broken and rev_zone and cp2_disp_ok and sweep_high > disp_low:
+                    zone_low, zone_high = min(rev_zone), max(rev_zone)
+                    invalidated = any(c["high"] > sweep_high for c in after_sweep[-3:]) or live_price > sweep_high
+
+                    # Step 4: Pullback into FVG/OB with CP3 controlled volume + live entry break
+                    in_pullback = (prev["high"] >= zone_low and prev["close"] <= zone_high) or (
+                        curr["high"] >= zone_low and curr["close"] <= zone_high
+                    )
+                    cp3_ok = (not vol_available) or (prev.get("volume", 0) <= base_vol * 1.35)
+                    bearish_confirm = curr["close"] < curr["open"] and curr["high"] >= zone_low
+
+                    if not invalidated and in_pullback and cp3_ok and bearish_confirm and live_price < curr["low"]:
+                        entry = float(live_price)
+                        sl = float(sweep_high + (0.15 * atr))
+                        risk = sl - entry
+                        if risk > 0:
+                            tp1 = float(min(eq_50, disp_low))
+                            opposing_ssl = anchor_low if (anchor_low is not None and anchor_low < tp1) else range_low
+                            tp2 = float(min(opposing_ssl, entry - (2.2 * risk)))
+                            rr = (entry - tp2) / risk
+                            if rr >= 2.0:
+                                be_price = float(entry - risk)
+                                setups.append({
+                                    "trade_id": f"STRAT06_{symbol}_{market}_{style}_{tf}_SHORT_{curr.get('time', '')}",
+                                    "symbol": symbol,
+                                    "market": market,
+                                    "strategy": STRATEGY_6_CONFIG["name"],
                                     "direction": "SHORT",
                                     "style": style,
                                     "timeframe": tf,
@@ -1570,6 +1812,25 @@ def evaluate_strategies_detailed(symbol, market, price, candles_by_tf=None):
                     candles=tf_candles,
                     live_price=price,
                     htf_poi_bias=htf_poi_bias,
+                    now_dt=now_dt,
+                )
+                setups.extend(matches)
+
+    # --- Strategy #6: Liquidity Sweep & Reversal Model (Intraday + Swing, No Killzone) ---
+    if hours_ok:
+        s6_tfs = STRATEGY_6_CONFIG["timeframes"].get(market, {})
+        htf_pool_bias = check_htf_bias(candles_by_tf)
+        for style in ("Intraday", "Swing"):
+            for tf in s6_tfs.get(style, []):
+                tf_candles = candles_by_tf.get(tf) or []
+                matches = evaluate_liquidity_sweep_reversal_tf(
+                    symbol=symbol,
+                    market=market,
+                    style=style,
+                    tf=tf,
+                    candles=tf_candles,
+                    live_price=price,
+                    htf_bias=htf_pool_bias if style == "Swing" else "NEUTRAL",
                     now_dt=now_dt,
                 )
                 setups.extend(matches)
