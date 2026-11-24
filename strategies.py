@@ -196,6 +196,24 @@ STRATEGY_9_CONFIG = {
     },
 }
 
+STRATEGY_10_CONFIG = {
+    "id": "STRAT_10",
+    "name": "Dealing Range Open Float Model",
+    "markets": ["NSE", "Crypto"],
+    "pending_markets": ["MCX"],
+    "styles": ["Intraday"],
+    "use_killzone": True,
+    "nse_bypass_killzone": True,
+    "timeframes": {
+        "NSE": {
+            "Intraday": ["3m", "5m", "15m"],
+        },
+        "Crypto": {
+            "Intraday": ["15m", "30m", "1h"],
+        },
+    },
+}
+
 NSE_INDEX_SYMBOLS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "^NSEI", "^NSEBANK", "^CNXFIN", "^BSESN"}
 
 
@@ -240,6 +258,7 @@ def check_market_open_hours(market, now_dt=None):
 def check_session_and_killzone(market, style, now_dt=None):
     """
     Market hours aur Intraday Killzone alignment check (IST).
+    NSE mein Killzone bypass rule apply hota hai (09:15 AM - 03:30 PM IST).
     Swing mode mein Killzone bypass rehta hai, par active market hours check honge.
     """
     allowed_hours, reason = check_market_open_hours(market, now_dt)
@@ -250,7 +269,7 @@ def check_session_and_killzone(market, style, now_dt=None):
     t = now_dt.time()
 
     if market == "NSE":
-        return True, "NSE Active Hours"
+        return True, "NSE Active Hours (Killzone Bypassed)"
 
     if market == "Crypto":
         if style == "Swing":
@@ -380,7 +399,7 @@ def check_htf_poi_bias(candles_by_tf, live_price):
 
 def _has_institutional_reference_confluence(symbol, market, zone_low, zone_high, atr):
     """
-    Strategy #5 & #9: Checks whether the array / retest zone aligns with or sits near
+    Strategy #5, #9 & #10: Checks whether the setup / trap zone aligns with or sits near
     a relevant Institutional Reference Number (00 / 20 / 50 / 80 endings or round levels).
     """
     mid_price = (zone_low + zone_high) / 2.0
@@ -399,7 +418,6 @@ def _has_institutional_reference_confluence(symbol, market, zone_low, zone_high,
     else:
         step = 1.0
 
-    # Check both major step levels and 00/20/50/80 sub-increments
     candidates = []
     base_lower = (mid_price // step) * step
     for m in (-1, 0, 1, 2):
@@ -2235,17 +2253,14 @@ def evaluate_pd_array_matrix_tf(
                 continue
 
             arr_mid = (arr_low + arr_high) / 2.0
-            # Step 1: Array must sit in Discount zone (< 50% equilibrium)
             if arr_mid > eq_50:
                 continue
 
-            # Step 2: HTF POI + Institutional Reference Number confluence
             htf_ok = _has_htf_poi_confluence(candles_by_tf, arr_low, arr_high, atr, direction="LONG")
             inst_ref_ok = _has_institutional_reference_confluence(symbol, market, arr_low, arr_high, atr)
             if not (htf_ok and inst_ref_ok):
                 continue
 
-            # CP1: Controlled / non-climactic volume during array tap/formation
             arr_vols = [x.get("volume", 0) or 0 for x in (c0, c1, c2)]
             arr_avg_vol = (sum(arr_vols) / len(arr_vols)) if arr_vols else 0.0
             cp1_ok = (not vol_available) or (arr_avg_vol <= base_vol * 1.25)
@@ -2256,7 +2271,6 @@ def evaluate_pd_array_matrix_tf(
             prior_highs = [h for idx, h in swing_highs if idx <= i]
             mss_target = prior_highs[-1] if prior_highs else max(c["high"] for c in lookback[: i + 1])
 
-            # Step 3: Bullish Displaced MSS leg + CP2 expanding volume
             disp_rel_idx = None
             cp2_ok = False
             for j, c_disp in enumerate(post_arr[:-1]):
@@ -2274,7 +2288,6 @@ def evaluate_pd_array_matrix_tf(
             broke_inv_low = any(c["low"] < inv_low for c in after_disp[-3:]) or (live_price < inv_low)
             invalidated = decisive_break_arr or broke_inv_low
 
-            # CP3: Controlled volume on array retest / pullback + live entry break
             cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
             retest_touch = (prev["low"] <= arr_high and prev["close"] >= arr_low) or (
                 curr["low"] <= arr_high and curr["close"] >= arr_low
@@ -2333,17 +2346,14 @@ def evaluate_pd_array_matrix_tf(
                 continue
 
             arr_mid = (arr_low + arr_high) / 2.0
-            # Step 1: Array must sit in Premium zone (> 50% equilibrium)
             if arr_mid < eq_50:
                 continue
 
-            # Step 2: HTF POI + Institutional Reference Number confluence
             htf_ok = _has_htf_poi_confluence(candles_by_tf, arr_low, arr_high, atr, direction="SHORT")
             inst_ref_ok = _has_institutional_reference_confluence(symbol, market, arr_low, arr_high, atr)
             if not (htf_ok and inst_ref_ok):
                 continue
 
-            # CP1: Controlled / non-climactic volume during array tap/formation
             arr_vols = [x.get("volume", 0) or 0 for x in (c0, c1, c2)]
             arr_avg_vol = (sum(arr_vols) / len(arr_vols)) if arr_vols else 0.0
             cp1_ok = (not vol_available) or (arr_avg_vol <= base_vol * 1.25)
@@ -2354,7 +2364,6 @@ def evaluate_pd_array_matrix_tf(
             prior_lows = [l for idx, l in swing_lows if idx <= i]
             mss_target = prior_lows[-1] if prior_lows else min(c["low"] for c in lookback[: i + 1])
 
-            # Step 3: Bearish Displaced MSS leg + CP2 expanding volume
             disp_rel_idx = None
             cp2_ok = False
             for j, c_disp in enumerate(post_arr[:-1]):
@@ -2372,7 +2381,6 @@ def evaluate_pd_array_matrix_tf(
             broke_inv_high = any(c["high"] > inv_high for c in after_disp[-3:]) or (live_price > inv_high)
             invalidated = decisive_break_arr or broke_inv_high
 
-            # CP3: Controlled volume on array retest / pullback + live entry break
             cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
             retest_touch = (prev["high"] >= arr_low and prev["close"] <= arr_high) or (
                 curr["high"] >= arr_low and curr["close"] <= arr_high
@@ -2412,6 +2420,210 @@ def evaluate_pd_array_matrix_tf(
                             "status": "OPEN",
                         })
                         break
+
+    return setups
+
+
+# ==============================================================================
+# STRATEGY #10: DEALING RANGE OPEN FLOAT MODEL (INTRADAY ONLY)
+# ==============================================================================
+def evaluate_open_float_model_tf(symbol, market, tf, candles, live_price, now_dt=None):
+    """
+    Isolated single-timeframe state evaluation for Dealing Range Open Float Model (Intraday Only).
+    Tracks isolated timeframe-local open-float & dealing range levels, Institutional Reference Number,
+    Judas Swing Trap + Reversal Displacement, and 3 Volume Checkpoints.
+    NSE bypasses killzone during 09:15 AM - 03:30 PM IST; Crypto checks active killzone alignment.
+    """
+    if not candles or len(candles) < 35:
+        return []
+
+    now_str = format_ist_timestamp(now_dt)
+    setups = []
+    atr = calc_atr(candles, 14)
+    base_vol = avg_volume(candles[:-1], 20)
+    is_nse_index = market == "NSE" and symbol.upper() in NSE_INDEX_SYMBOLS
+    vol_available = base_vol > 0 and not is_nse_index
+
+    lookback = candles[-30:]
+    curr = lookback[-1]
+    prev = lookback[-2]
+
+    # Isolated timeframe-local Open Float & Dealing Range anchor levels
+    open_float_candles = lookback[:6]
+    open_float_high = max(c["high"] for c in open_float_candles)
+    open_float_low = min(c["low"] for c in open_float_candles)
+
+    dealing_high = max(c["high"] for c in lookback[:-2])
+    dealing_low = min(c["low"] for c in lookback[:-2])
+    if dealing_high <= dealing_low:
+        return []
+    eq_50 = (dealing_high + dealing_low) / 2.0
+
+    swing_lows = _find_swing_lows(lookback[:-4], 2, 2)
+    swing_highs = _find_swing_highs(lookback[:-4], 2, 2)
+
+    # ---------------- LONG ENTRY LOGIC (BEARISH JUDAS TRAP + OPEN FLOAT LONG) ----------------
+    post_of = lookback[6:]
+    if len(post_of) >= 4:
+        trap_candidates = post_of[:-2]
+        judas_low_candle = min(trap_candidates, key=lambda c: c["low"])
+        trap_low = judas_low_candle["low"]
+        trap_idx = post_of.index(judas_low_candle)
+
+        prior_low_ref = swing_lows[-1][1] if swing_lows else open_float_low
+        swept_low = trap_low < min(open_float_low, prior_low_ref)
+
+        # CP1: Controlled / non-climactic volume during open float & trap approach
+        of_vols = [x.get("volume", 0) or 0 for x in open_float_candles]
+        of_avg_vol = (sum(of_vols) / len(of_vols)) if of_vols else 0.0
+        cp1_ok = (not vol_available) or (of_avg_vol <= base_vol * 1.25)
+
+        inst_ref_ok = _has_institutional_reference_confluence(
+            symbol, market, trap_low, max(trap_low, open_float_low), atr
+        )
+
+        if swept_low and cp1_ok and inst_ref_ok:
+            after_trap = post_of[trap_idx + 1 :]
+            trap_mss_high = max(open_float_high, max((c["high"] for c in post_of[: trap_idx + 1]), default=open_float_high))
+
+            # Step 3: Bullish reversal displacement breaking above trap/internal swing high + CP2 volume
+            disp_rel_idx = None
+            cp2_ok = False
+            for j, c_disp in enumerate(after_trap[:-1]):
+                if c_disp["close"] > trap_mss_high and (c_disp["close"] - c_disp["open"]) > atr * 0.45:
+                    disp_rel_idx = j
+                    cp2_ok = (not vol_available) or (c_disp.get("volume", 0) >= base_vol * 1.15)
+                    break
+
+            if disp_rel_idx is not None and cp2_ok:
+                after_disp = after_trap[disp_rel_idx + 1 :]
+                inv_low = min(trap_low, open_float_low)
+                decisive_break_trap = any(c["close"] < trap_low for c in after_trap[trap_idx:]) or (curr["close"] < trap_low)
+                broke_inv_low = any(c["low"] < inv_low for c in after_disp[-3:]) or (live_price < inv_low)
+                invalidated = decisive_break_trap or broke_inv_low
+
+                pullback_zone_low = min(trap_low, open_float_low)
+                pullback_zone_high = max(open_float_low, eq_50)
+
+                # CP3: Controlled volume on pullback into open float / retest area + live entry break
+                cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
+                in_pullback = (prev["low"] <= pullback_zone_high and prev["close"] >= pullback_zone_low) or (
+                    curr["low"] <= pullback_zone_high and curr["close"] >= pullback_zone_low
+                )
+                bullish_confirm = curr["close"] > curr["open"] and curr["low"] <= pullback_zone_high
+
+                if not invalidated and cp3_ok and in_pullback and bullish_confirm and live_price > curr["high"]:
+                    trap_swing_low = min(prev["low"], curr["low"], trap_low)
+                    entry = float(live_price)
+                    sl = float(trap_swing_low - (0.15 * atr))
+                    risk = entry - sl
+                    if risk > 0:
+                        tp1 = float(max(eq_50, open_float_high))
+                        tp2 = float(max(dealing_high, entry + (2.2 * risk)))
+                        rr = (tp2 - entry) / risk
+                        if rr >= 2.0:
+                            be_price = float(entry + risk)
+                            setups.append({
+                                "trade_id": f"STRAT10_{symbol}_{market}_Intraday_{tf}_LONG_{curr.get('time', '')}",
+                                "symbol": symbol,
+                                "market": market,
+                                "strategy": STRATEGY_10_CONFIG["name"],
+                                "direction": "LONG",
+                                "style": "Intraday",
+                                "timeframe": tf,
+                                "entry": round(entry, 4),
+                                "entry_time": now_str,
+                                "sl": round(sl, 4),
+                                "active_sl": round(sl, 4),
+                                "be_trigger": round(be_price, 4),
+                                "tp1": round(tp1, 4),
+                                "tp2": round(tp2, 4),
+                                "rr": round(rr, 2),
+                                "be_hit": False,
+                                "tp1_hit": False,
+                                "status": "OPEN",
+                            })
+
+    # ---------------- SHORT SELL LOGIC (BULLISH JUDAS TRAP + OPEN FLOAT SHORT) ----------------
+    if len(post_of) >= 4:
+        trap_candidates = post_of[:-2]
+        judas_high_candle = max(trap_candidates, key=lambda c: c["high"])
+        trap_high = judas_high_candle["high"]
+        trap_idx = post_of.index(judas_high_candle)
+
+        prior_high_ref = swing_highs[-1][1] if swing_highs else open_float_high
+        swept_high = trap_high > max(open_float_high, prior_high_ref)
+
+        # CP1: Controlled / non-climactic volume during open float & trap approach
+        of_vols = [x.get("volume", 0) or 0 for x in open_float_candles]
+        of_avg_vol = (sum(of_vols) / len(of_vols)) if of_vols else 0.0
+        cp1_ok = (not vol_available) or (of_avg_vol <= base_vol * 1.25)
+
+        inst_ref_ok = _has_institutional_reference_confluence(
+            symbol, market, min(trap_high, open_float_high), trap_high, atr
+        )
+
+        if swept_high and cp1_ok and inst_ref_ok:
+            after_trap = post_of[trap_idx + 1 :]
+            trap_low_mss = min(open_float_low, min((c["low"] for c in post_of[: trap_idx + 1]), default=open_float_low))
+
+            # Step 3: Bearish reversal displacement breaking below trap/internal swing low + CP2 volume
+            disp_rel_idx = None
+            cp2_ok = False
+            for j, c_disp in enumerate(after_trap[:-1]):
+                if c_disp["close"] < trap_low_mss and (c_disp["open"] - c_disp["close"]) > atr * 0.45:
+                    disp_rel_idx = j
+                    cp2_ok = (not vol_available) or (c_disp.get("volume", 0) >= base_vol * 1.15)
+                    break
+
+            if disp_rel_idx is not None and cp2_ok:
+                after_disp = after_trap[disp_rel_idx + 1 :]
+                inv_high = max(trap_high, open_float_high)
+                decisive_break_trap = any(c["close"] > trap_high for c in after_trap[trap_idx:]) or (curr["close"] > trap_high)
+                broke_inv_high = any(c["high"] > inv_high for c in after_disp[-3:]) or (live_price > inv_high)
+                invalidated = decisive_break_trap or broke_inv_high
+
+                pullback_zone_low = min(eq_50, open_float_high)
+                pullback_zone_high = max(trap_high, open_float_high)
+
+                # CP3: Controlled volume on pullback into open float / retest area + live entry break
+                cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
+                in_pullback = (prev["high"] >= pullback_zone_low and prev["close"] <= pullback_zone_high) or (
+                    curr["high"] >= pullback_zone_low and curr["close"] <= pullback_zone_high
+                )
+                bearish_confirm = curr["close"] < curr["open"] and curr["high"] >= pullback_zone_low
+
+                if not invalidated and cp3_ok and in_pullback and bearish_confirm and live_price < curr["low"]:
+                    trap_swing_high = max(prev["high"], curr["high"], trap_high)
+                    entry = float(live_price)
+                    sl = float(trap_swing_high + (0.15 * atr))
+                    risk = sl - entry
+                    if risk > 0:
+                        tp1 = float(min(eq_50, open_float_low))
+                        tp2 = float(min(dealing_low, entry - (2.2 * risk)))
+                        rr = (entry - tp2) / risk
+                        if rr >= 2.0:
+                            be_price = float(entry - risk)
+                            setups.append({
+                                "trade_id": f"STRAT10_{symbol}_{market}_Intraday_{tf}_SHORT_{curr.get('time', '')}",
+                                "symbol": symbol,
+                                "market": market,
+                                "strategy": STRATEGY_10_CONFIG["name"],
+                                "direction": "SHORT",
+                                "style": "Intraday",
+                                "timeframe": tf,
+                                "entry": round(entry, 4),
+                                "entry_time": now_str,
+                                "sl": round(sl, 4),
+                                "active_sl": round(sl, 4),
+                                "be_trigger": round(be_price, 4),
+                                "tp1": round(tp1, 4),
+                                "tp2": round(tp2, 4),
+                                "rr": round(rr, 2),
+                                "be_hit": False,
+                                "tp1_hit": False,
+                                "status": "OPEN",
+                            })
 
     return setups
 
@@ -2715,6 +2927,22 @@ def evaluate_strategies_detailed(symbol, market, price, candles_by_tf=None):
                     now_dt=now_dt,
                 )
                 setups.extend(matches)
+
+    # --- Strategy #10: Dealing Range Open Float Model (Intraday Only, NSE Killzone Bypassed) ---
+    s10_allowed, _ = check_session_and_killzone(market, "Intraday", now_dt)
+    if s10_allowed:
+        s10_tfs = STRATEGY_10_CONFIG["timeframes"].get(market, {}).get("Intraday", [])
+        for tf in s10_tfs:
+            tf_candles = candles_by_tf.get(tf) or []
+            matches = evaluate_open_float_model_tf(
+                symbol=symbol,
+                market=market,
+                tf=tf,
+                candles=tf_candles,
+                live_price=price,
+                now_dt=now_dt,
+            )
+            setups.extend(matches)
 
     for m in setups:
         label = (
