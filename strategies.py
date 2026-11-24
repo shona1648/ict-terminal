@@ -42,7 +42,7 @@ def _in_window(now_t, start_t, end_t):
 
 def check_session_and_killzone(market, style, now_dt=None):
     """
-    Step 1: Market hours aur Intraday Killzone alignment check (IST).
+    Market hours aur Intraday Killzone alignment check (IST).
     Swing mode mein Killzone bypass rehta hai, par active market hours check honge.
     """
     if market in PENDING_MARKETS:
@@ -139,6 +139,9 @@ def _find_swing_highs(candles, left=2, right=2):
     return highs
 
 
+# ==============================================================================
+# STRATEGY #1: ICT 2022 MODEL
+# ==============================================================================
 def evaluate_ict_2022_tf(symbol, market, style, tf, candles, live_price, htf_bias="NEUTRAL", now_dt=None):
     """
     Isolated single-timeframe state evaluation for ICT 2022 Model (LONG & SHORT).
@@ -221,7 +224,7 @@ def evaluate_ict_2022_tf(symbol, market, style, tf, candles, live_price, htf_bia
                             if rr >= 2.0:
                                 be_price = float(entry + risk)
                                 setups.append({
-                                    "trade_id": f"{symbol}_{market}_{style}_{tf}_LONG_{curr.get('time', '')}",
+                                    "trade_id": f"STRAT01_{symbol}_{market}_{style}_{tf}_LONG_{curr.get('time', '')}",
                                     "symbol": symbol,
                                     "market": market,
                                     "strategy": STRATEGY_1_CONFIG["name"],
@@ -298,7 +301,7 @@ def evaluate_ict_2022_tf(symbol, market, style, tf, candles, live_price, htf_bia
                             if rr >= 2.0:
                                 be_price = float(entry - risk)
                                 setups.append({
-                                    "trade_id": f"{symbol}_{market}_{style}_{tf}_SHORT_{curr.get('time', '')}",
+                                    "trade_id": f"STRAT01_{symbol}_{market}_{style}_{tf}_SHORT_{curr.get('time', '')}",
                                     "symbol": symbol,
                                     "market": market,
                                     "strategy": STRATEGY_1_CONFIG["name"],
@@ -321,6 +324,9 @@ def evaluate_ict_2022_tf(symbol, market, style, tf, candles, live_price, htf_bia
     return setups
 
 
+# ==============================================================================
+# LIVE TRADE MANAGEMENT (BE@1:1, TP1, TP2, SL WITH IST TIMESTAMPS)
+# ==============================================================================
 def process_live_trade_updates(active_trades, current_prices, now_dt=None):
     """
     Open trades ka live price check karke BE@1:1, TP1 Hit, TP2 Hit, aur SL Hit alerts
@@ -427,6 +433,9 @@ def process_live_trade_updates(active_trades, current_prices, now_dt=None):
     return messages, remaining
 
 
+# ==============================================================================
+# MASTER STRATEGY EVALUATOR
+# ==============================================================================
 def evaluate_strategies_detailed(symbol, market, price, candles_by_tf=None):
     """
     Structured setup dicts aur formatted Telegram alert strings dono return karta hai.
@@ -436,16 +445,16 @@ def evaluate_strategies_detailed(symbol, market, price, candles_by_tf=None):
 
     setups = []
     formatted_alerts = []
-    market_tfs = STRATEGY_1_CONFIG["timeframes"].get(market, {})
     now_dt = get_ist_now()
 
+    s1_tfs = STRATEGY_1_CONFIG["timeframes"].get(market, {})
     for style in ("Intraday", "Swing"):
         allowed, _ = check_session_and_killzone(market, style, now_dt)
         if not allowed:
             continue
 
         htf_bias = check_htf_bias(candles_by_tf) if style == "Swing" else "NEUTRAL"
-        for tf in market_tfs.get(style, []):
+        for tf in s1_tfs.get(style, []):
             tf_candles = candles_by_tf.get(tf) or []
             matches = evaluate_ict_2022_tf(
                 symbol=symbol,
