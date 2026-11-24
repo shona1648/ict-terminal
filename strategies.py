@@ -70,6 +70,27 @@ STRATEGY_3_CONFIG = {
     },
 }
 
+STRATEGY_4_CONFIG = {
+    "id": "STRAT_04",
+    "name": "Market Maker Buy/Sell Model (MMMS)",
+    "markets": ["NSE", "Crypto"],
+    "pending_markets": ["MCX"],
+    "styles": ["Intraday", "Swing"],
+    "use_killzone": False,
+    "timeframes": {
+        "NSE": {
+            "Intraday": ["3m", "5m", "15m"],
+            "Swing": ["1h", "4h", "1d"],
+            "HTF_POI": ["4h", "1d", "1w"],
+        },
+        "Crypto": {
+            "Intraday": ["15m", "30m", "1h"],
+            "Swing": ["1h", "4h", "1d"],
+            "HTF_POI": ["4h", "1d", "1w"],
+        },
+    },
+}
+
 NSE_INDEX_SYMBOLS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "^NSEI", "^NSEBANK", "^CNXFIN", "^BSESN"}
 
 
@@ -217,7 +238,7 @@ def check_htf_bias(candles_by_tf):
 
 def check_htf_poi_bias(candles_by_tf, live_price):
     """
-    Strategy #3 Swing mode ke liye 4H / 1D / 1W HTF POI (OB / FVG / Major Swing) confluence check.
+    Swing mode ke liye 4H / 1D / 1W HTF POI (OB / FVG / Breaker / Mitigation / Major Swing) confluence check.
     Returns: 'BULLISH', 'BEARISH', or 'NEUTRAL'
     """
     for htf in ("4h", "1d", "1w"):
@@ -666,7 +687,6 @@ def evaluate_po3_amd_tf(symbol, market, style, tf, candles, live_price, htf_poi_
 
     # ---------------- LONG ENTRY LOGIC (BULLISH POWER OF 3 — AMD) ----------------
     if style == "Intraday" or htf_poi_bias == "BULLISH":
-        # Phase 1: Tight horizontal Accumulation box with compressed volume (CP1)
         for box_start in range(len(lookback) - 14, len(lookback) - 7):
             if box_start < 2:
                 continue
@@ -686,7 +706,6 @@ def evaluate_po3_amd_tf(symbol, market, style, tf, candles, live_price, htf_poi_
             if len(post_acc) < 3 or not cp1_ok:
                 continue
 
-            # Phase 2: Bearish Judas Swing trap below accumulation_low + CP2 spike
             trap_candidates = post_acc[:-1]
             judas_candle = min(trap_candidates, key=lambda c: c["low"])
             judas_low = judas_candle["low"]
@@ -695,7 +714,6 @@ def evaluate_po3_amd_tf(symbol, market, style, tf, candles, live_price, htf_poi_
             if judas_low < acc_low:
                 cp2_trap_ok = (not vol_available) or (judas_candle.get("volume", 0) >= base_vol * 1.1)
 
-                # Phase 3: Bullish Displaced MSS above accumulation_high / prior swing + FVG/OB
                 after_judas = post_acc[judas_idx + 1 :]
                 mss_target = max(acc_high, max(c["high"] for c in lookback[box_start : box_start + 4 + judas_idx]))
                 disp_high = max((c["high"] for c in after_judas), default=0)
@@ -714,7 +732,6 @@ def evaluate_po3_amd_tf(symbol, market, style, tf, candles, live_price, htf_poi_
                                 poi_zone = (c0["high"], c2["low"])
                                 break
                         if poi_zone is None:
-                            # Bullish Order Block fallback (last bearish/down candle before displacement)
                             poi_zone = (c_item["low"], max(c_item["open"], c_item["close"]))
                             break
 
@@ -781,7 +798,6 @@ def evaluate_po3_amd_tf(symbol, market, style, tf, candles, live_price, htf_poi_
             if len(post_acc) < 3 or not cp1_ok:
                 continue
 
-            # Phase 2: Bullish Judas Swing trap above accumulation_high + CP2 spike
             trap_candidates = post_acc[:-1]
             judas_candle = max(trap_candidates, key=lambda c: c["high"])
             judas_high = judas_candle["high"]
@@ -790,7 +806,6 @@ def evaluate_po3_amd_tf(symbol, market, style, tf, candles, live_price, htf_poi_
             if judas_high > acc_high:
                 cp2_trap_ok = (not vol_available) or (judas_candle.get("volume", 0) >= base_vol * 1.1)
 
-                # Phase 3: Bearish Displaced MSS below accumulation_low / prior swing + FVG/OB
                 after_judas = post_acc[judas_idx + 1 :]
                 mss_target = min(acc_low, min(c["low"] for c in lookback[box_start : box_start + 4 + judas_idx]))
                 disp_low = min((c["low"] for c in after_judas), default=0)
@@ -853,6 +868,216 @@ def evaluate_po3_amd_tf(symbol, market, style, tf, candles, live_price, htf_poi_
                                     "status": "OPEN",
                                 })
                         break
+
+    return setups
+
+
+# ==============================================================================
+# STRATEGY #4: MARKET MAKER BUY/SELL MODEL — MMMS (INTRADAY & HTF POI SWING)
+# ==============================================================================
+def evaluate_mmms_tf(symbol, market, style, tf, candles, live_price, htf_poi_bias="NEUTRAL", now_dt=None):
+    """
+    Isolated single-timeframe state evaluation for Market Maker Buy/Sell Model (MMMS).
+    Supports LONG (MMBM) and SHORT (MMSM) across Intraday and Swing (with HTF POI).
+    No killzone filter.
+    """
+    if not candles or len(candles) < 35:
+        return []
+
+    if style == "Swing" and htf_poi_bias == "NEUTRAL":
+        return []
+
+    now_str = format_ist_timestamp(now_dt)
+    setups = []
+    atr = calc_atr(candles, 14)
+    base_vol = avg_volume(candles[:-1], 20)
+    is_nse_index = market == "NSE" and symbol.upper() in NSE_INDEX_SYMBOLS
+    vol_available = base_vol > 0 and not is_nse_index
+
+    lookback = candles[-32:]
+    curr = lookback[-1]
+    prev = lookback[-2]
+
+    swing_lows = _find_swing_lows(lookback[:-4], 2, 2)
+    swing_highs = _find_swing_highs(lookback[:-4], 2, 2)
+
+    # ---------------- LONG ENTRY LOGIC (MMBM — MARKET MAKER BUY MODEL) ----------------
+    if (style == "Intraday" or htf_poi_bias == "BULLISH") and swing_lows and swing_highs:
+        ssl_idx, ssl_level = swing_lows[-1]
+        post_ssl = lookback[ssl_idx + 1 :]
+
+        if len(post_ssl) >= 4:
+            # CP1: Controlled / non-climactic volume along sell-side engineering leg
+            eng_start = max(0, ssl_idx - 4)
+            eng_candles = lookback[eng_start : ssl_idx + 1]
+            eng_vols = [c.get("volume", 0) or 0 for c in eng_candles]
+            eng_avg_vol = (sum(eng_vols) / len(eng_vols)) if eng_vols else 0.0
+            cp1_ok = (not vol_available) or (eng_avg_vol <= base_vol * 1.25)
+
+            # Step 3: Sell-Side Liquidity Sweep (Smart Money Reversal Base) + CP2 spike
+            sweep_candle = min(post_ssl[:-2], key=lambda c: c["low"])
+            sweep_low = sweep_candle["low"]
+            sweep_idx = post_ssl.index(sweep_candle)
+
+            if sweep_low < ssl_level and cp1_ok:
+                cp2_sweep_ok = (not vol_available) or (sweep_candle.get("volume", 0) >= base_vol * 1.1)
+
+                # Step 4: Bullish Displaced MSS + Liquidity Void / FVG / OB
+                after_sweep = post_ssl[sweep_idx + 1 :]
+                prior_highs = [h for idx, h in swing_highs if idx <= ssl_idx + sweep_idx]
+                mss_target = prior_highs[-1] if prior_highs else max(c["high"] for c in lookback[: ssl_idx + 1])
+
+                disp_high = max((c["high"] for c in after_sweep), default=0)
+                mss_broken = any(c["close"] > mss_target for c in after_sweep)
+
+                void_zone = None
+                cp2_disp_ok = False
+                for i in range(len(after_sweep)):
+                    c_item = after_sweep[i]
+                    if (c_item["close"] - c_item["open"]) > atr * 0.55:
+                        if (not vol_available) or (c_item.get("volume", 0) >= base_vol * 1.15):
+                            cp2_disp_ok = True
+                        if i >= 2:
+                            c0, c1, c2 = after_sweep[i - 2], after_sweep[i - 1], after_sweep[i]
+                            if c0["high"] < c2["low"]:
+                                void_zone = (c0["high"], c2["low"])
+                                break
+                        if void_zone is None:
+                            void_zone = (c_item["low"], max(c_item["open"], c_item["close"]))
+                            break
+
+                if cp2_sweep_ok and mss_broken and void_zone and cp2_disp_ok and disp_high > sweep_low:
+                    zone_low, zone_high = min(void_zone), max(void_zone)
+                    invalidated = any(c["low"] < sweep_low for c in after_sweep[-3:]) or live_price < sweep_low
+
+                    # Step 5: Liquidity Void Fill + CP3 controlled pullback + confirmation break
+                    in_void = (prev["low"] <= zone_high and prev["close"] >= zone_low) or (
+                        curr["low"] <= zone_high and curr["close"] >= zone_low
+                    )
+                    cp3_ok = (not vol_available) or (prev.get("volume", 0) <= base_vol * 1.35)
+                    bullish_confirm = curr["close"] > curr["open"] and curr["low"] <= zone_high
+
+                    if not invalidated and in_void and cp3_ok and bullish_confirm and live_price > curr["high"]:
+                        entry = float(live_price)
+                        sl = float(sweep_low - (0.15 * atr))
+                        risk = entry - sl
+                        if risk > 0:
+                            tp1 = float(max(mss_target, disp_high))
+                            opposing_highs = [h for _, h in swing_highs if h > tp1]
+                            pool_tp2 = opposing_highs[0] if opposing_highs else (tp1 + risk)
+                            tp2 = float(max(pool_tp2, entry + (2.2 * risk)))
+                            rr = (tp2 - entry) / risk
+                            if rr >= 2.0:
+                                be_price = float(entry + risk)
+                                setups.append({
+                                    "trade_id": f"STRAT04_{symbol}_{market}_{style}_{tf}_LONG_{curr.get('time', '')}",
+                                    "symbol": symbol,
+                                    "market": market,
+                                    "strategy": STRATEGY_4_CONFIG["name"],
+                                    "direction": "LONG",
+                                    "style": style,
+                                    "timeframe": tf,
+                                    "entry": round(entry, 4),
+                                    "entry_time": now_str,
+                                    "sl": round(sl, 4),
+                                    "active_sl": round(sl, 4),
+                                    "be_trigger": round(be_price, 4),
+                                    "tp1": round(tp1, 4),
+                                    "tp2": round(tp2, 4),
+                                    "rr": round(rr, 2),
+                                    "be_hit": False,
+                                    "tp1_hit": False,
+                                    "status": "OPEN",
+                                })
+
+    # ---------------- SHORT SELL LOGIC (MMSM — MARKET MAKER SELL MODEL) ----------------
+    if (style == "Intraday" or htf_poi_bias == "BEARISH") and swing_highs and swing_lows:
+        bsl_idx, bsl_level = swing_highs[-1]
+        post_bsl = lookback[bsl_idx + 1 :]
+
+        if len(post_bsl) >= 4:
+            # CP1: Controlled / non-climactic volume along buy-side engineering leg
+            eng_start = max(0, bsl_idx - 4)
+            eng_candles = lookback[eng_start : bsl_idx + 1]
+            eng_vols = [c.get("volume", 0) or 0 for c in eng_candles]
+            eng_avg_vol = (sum(eng_vols) / len(eng_vols)) if eng_vols else 0.0
+            cp1_ok = (not vol_available) or (eng_avg_vol <= base_vol * 1.25)
+
+            # Step 3: Buy-Side Liquidity Sweep (Smart Money Reversal Top) + CP2 spike
+            sweep_candle = max(post_bsl[:-2], key=lambda c: c["high"])
+            sweep_high = sweep_candle["high"]
+            sweep_idx = post_bsl.index(sweep_candle)
+
+            if sweep_high > bsl_level and cp1_ok:
+                cp2_sweep_ok = (not vol_available) or (sweep_candle.get("volume", 0) >= base_vol * 1.1)
+
+                # Step 4: Bearish Displaced MSS + Liquidity Void / FVG / OB
+                after_sweep = post_bsl[sweep_idx + 1 :]
+                prior_lows = [l for idx, l in swing_lows if idx <= bsl_idx + sweep_idx]
+                mss_target = prior_lows[-1] if prior_lows else min(c["low"] for c in lookback[: bsl_idx + 1])
+
+                disp_low = min((c["low"] for c in after_sweep), default=0)
+                mss_broken = any(c["close"] < mss_target for c in after_sweep)
+
+                void_zone = None
+                cp2_disp_ok = False
+                for i in range(len(after_sweep)):
+                    c_item = after_sweep[i]
+                    if (c_item["open"] - c_item["close"]) > atr * 0.55:
+                        if (not vol_available) or (c_item.get("volume", 0) >= base_vol * 1.15):
+                            cp2_disp_ok = True
+                        if i >= 2:
+                            c0, c1, c2 = after_sweep[i - 2], after_sweep[i - 1], after_sweep[i]
+                            if c0["low"] > c2["high"]:
+                                void_zone = (c2["high"], c0["low"])
+                                break
+                        if void_zone is None:
+                            void_zone = (min(c_item["open"], c_item["close"]), c_item["high"])
+                            break
+
+                if cp2_sweep_ok and mss_broken and void_zone and cp2_disp_ok and sweep_high > disp_low:
+                    zone_low, zone_high = min(void_zone), max(void_zone)
+                    invalidated = any(c["high"] > sweep_high for c in after_sweep[-3:]) or live_price > sweep_high
+
+                    # Step 5: Liquidity Void Fill + CP3 controlled pullback + confirmation break
+                    in_void = (prev["high"] >= zone_low and prev["close"] <= zone_high) or (
+                        curr["high"] >= zone_low and curr["close"] <= zone_high
+                    )
+                    cp3_ok = (not vol_available) or (prev.get("volume", 0) <= base_vol * 1.35)
+                    bearish_confirm = curr["close"] < curr["open"] and curr["high"] >= zone_low
+
+                    if not invalidated and in_void and cp3_ok and bearish_confirm and live_price < curr["low"]:
+                        entry = float(live_price)
+                        sl = float(sweep_high + (0.15 * atr))
+                        risk = sl - entry
+                        if risk > 0:
+                            tp1 = float(min(mss_target, disp_low))
+                            opposing_lows = [l for _, l in swing_lows if l < tp1]
+                            pool_tp2 = opposing_lows[-1] if opposing_lows else (tp1 - risk)
+                            tp2 = float(min(pool_tp2, entry - (2.2 * risk)))
+                            rr = (entry - tp2) / risk
+                            if rr >= 2.0:
+                                be_price = float(entry - risk)
+                                setups.append({
+                                    "trade_id": f"STRAT04_{symbol}_{market}_{style}_{tf}_SHORT_{curr.get('time', '')}",
+                                    "symbol": symbol,
+                                    "market": market,
+                                    "strategy": STRATEGY_4_CONFIG["name"],
+                                    "direction": "SHORT",
+                                    "style": style,
+                                    "timeframe": tf,
+                                    "entry": round(entry, 4),
+                                    "entry_time": now_str,
+                                    "sl": round(sl, 4),
+                                    "active_sl": round(sl, 4),
+                                    "be_trigger": round(be_price, 4),
+                                    "tp1": round(tp1, 4),
+                                    "tp2": round(tp2, 4),
+                                    "rr": round(rr, 2),
+                                    "be_hit": False,
+                                    "tp1_hit": False,
+                                    "status": "OPEN",
+                                })
 
     return setups
 
@@ -1028,6 +1253,25 @@ def evaluate_strategies_detailed(symbol, market, price, candles_by_tf=None):
             for tf in s3_tfs.get(style, []):
                 tf_candles = candles_by_tf.get(tf) or []
                 matches = evaluate_po3_amd_tf(
+                    symbol=symbol,
+                    market=market,
+                    style=style,
+                    tf=tf,
+                    candles=tf_candles,
+                    live_price=price,
+                    htf_poi_bias=htf_poi_bias,
+                    now_dt=now_dt,
+                )
+                setups.extend(matches)
+
+    # --- Strategy #4: Market Maker Buy/Sell Model — MMMS (Intraday + HTF POI Swing, No Killzone) ---
+    if hours_ok:
+        s4_tfs = STRATEGY_4_CONFIG["timeframes"].get(market, {})
+        for style in ("Intraday", "Swing"):
+            htf_poi_bias = check_htf_poi_bias(candles_by_tf, price) if style == "Swing" else "NEUTRAL"
+            for tf in s4_tfs.get(style, []):
+                tf_candles = candles_by_tf.get(tf) or []
+                matches = evaluate_mmms_tf(
                     symbol=symbol,
                     market=market,
                     style=style,
