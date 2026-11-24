@@ -154,6 +154,27 @@ STRATEGY_7_CONFIG = {
     },
 }
 
+STRATEGY_8_CONFIG = {
+    "id": "STRAT_08",
+    "name": "MSS + Breaker Block Entry",
+    "markets": ["NSE", "Crypto"],
+    "pending_markets": ["MCX"],
+    "styles": ["Intraday", "Swing"],
+    "use_killzone": False,
+    "timeframes": {
+        "NSE": {
+            "Intraday": ["3m", "5m", "15m"],
+            "Swing": ["1h", "4h", "1d"],
+            "HTF_POI": ["4h", "1d", "1w"],
+        },
+        "Crypto": {
+            "Intraday": ["15m", "30m", "1h"],
+            "Swing": ["1h", "4h", "1d"],
+            "HTF_POI": ["4h", "1d", "1w"],
+        },
+    },
+}
+
 NSE_INDEX_SYMBOLS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "^NSEI", "^NSEBANK", "^CNXFIN", "^BSESN"}
 
 
@@ -370,7 +391,7 @@ def _has_institutional_reference_confluence(symbol, market, zone_low, zone_high,
 
 def _has_htf_poi_confluence(candles_by_tf, zone_low, zone_high, atr, direction="LONG"):
     """
-    Strategy #7: Isolated HTF POI confluence check using 4H / 1D / 1W structure/POI levels
+    Strategy #7 & #8: Isolated HTF POI confluence check using 4H / 1D / 1W structure/POI levels
     without relying on cross-timeframe running state.
     """
     if not candles_by_tf:
@@ -1687,11 +1708,9 @@ def evaluate_ifvg_continuation_tf(
     if (style == "Intraday" or htf_poi_bias == "BULLISH") and range_high > range_low:
         for i in range(2, len(lookback) - 3):
             c0, c1, c2 = lookback[i - 2], lookback[i - 1], lookback[i]
-            # Opposing Bearish FVG: c2["high"] < c0["low"]
             if c2["high"] < c0["low"]:
                 bear_fvg_low, bear_fvg_high = c2["high"], c0["low"]
 
-                # CP1: Controlled / non-climactic volume during opposing FVG formation
                 fvg_vols = [x.get("volume", 0) or 0 for x in (c0, c1, c2)]
                 fvg_avg_vol = (sum(fvg_vols) / len(fvg_vols)) if fvg_vols else 0.0
                 cp1_ok = (not vol_available) or (fvg_avg_vol <= base_vol * 1.25)
@@ -1702,7 +1721,6 @@ def evaluate_ifvg_continuation_tf(
                 prior_highs = [h for idx, h in swing_highs if idx <= i]
                 mss_target = prior_highs[-1] if prior_highs else max(c["high"] for c in lookback[: i + 1])
 
-                # Step 2: Bullish displacement leg inverting Bearish FVG (close > bear_fvg_high) + Displaced MSS
                 disp_idx = None
                 cp2_ok = False
                 for j, c_disp in enumerate(post_fvg[:-1]):
@@ -1720,18 +1738,14 @@ def evaluate_ifvg_continuation_tf(
                     ifvg_low, ifvg_high = bear_fvg_low, bear_fvg_high
                     ifvg_mid = (ifvg_low + ifvg_high) / 2.0
 
-                    # Step 1: Discount zone check (< 50% dealing range equilibrium)
                     in_discount = ifvg_mid <= eq_50
-                    # Step 3: HTF POI confluence check
                     htf_ok = _has_htf_poi_confluence(candles_by_tf, ifvg_low, ifvg_high, atr, direction="LONG")
 
-                    # Invalidation: decisive close below Bullish iFVG lower boundary or swing low break
                     inv_swing_low = min(c["low"] for c in lookback[max(0, i - 2) : i + 1 + disp_idx + 1])
                     decisive_break_ifvg = any(c["close"] < ifvg_low for c in post_fvg[disp_idx:]) or (curr["close"] < ifvg_low)
                     broke_inv_low = any(c["low"] < inv_swing_low for c in after_disp[-3:]) or (live_price < inv_swing_low)
                     invalidated = decisive_break_ifvg or broke_inv_low
 
-                    # CP3: Controlled volume on iFVG retest pullback + live entry break
                     cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
                     retest_touch = (prev["low"] <= ifvg_high and prev["close"] >= ifvg_low) or (
                         curr["low"] <= ifvg_high and curr["close"] >= ifvg_low
@@ -1784,11 +1798,9 @@ def evaluate_ifvg_continuation_tf(
     if (style == "Intraday" or htf_poi_bias == "BEARISH") and range_high > range_low:
         for i in range(2, len(lookback) - 3):
             c0, c1, c2 = lookback[i - 2], lookback[i - 1], lookback[i]
-            # Opposing Bullish FVG: c0["high"] < c2["low"]
             if c0["high"] < c2["low"]:
                 bull_fvg_low, bull_fvg_high = c0["high"], c2["low"]
 
-                # CP1: Controlled / non-climactic volume during opposing FVG formation
                 fvg_vols = [x.get("volume", 0) or 0 for x in (c0, c1, c2)]
                 fvg_avg_vol = (sum(fvg_vols) / len(fvg_vols)) if fvg_vols else 0.0
                 cp1_ok = (not vol_available) or (fvg_avg_vol <= base_vol * 1.25)
@@ -1799,7 +1811,6 @@ def evaluate_ifvg_continuation_tf(
                 prior_lows = [l for idx, l in swing_lows if idx <= i]
                 mss_target = prior_lows[-1] if prior_lows else min(c["low"] for c in lookback[: i + 1])
 
-                # Step 2: Bearish displacement leg inverting Bullish FVG (close < bull_fvg_low) + Displaced MSS
                 disp_idx = None
                 cp2_ok = False
                 for j, c_disp in enumerate(post_fvg[:-1]):
@@ -1817,18 +1828,14 @@ def evaluate_ifvg_continuation_tf(
                     ifvg_low, ifvg_high = bull_fvg_low, bull_fvg_high
                     ifvg_mid = (ifvg_low + ifvg_high) / 2.0
 
-                    # Step 1: Premium zone check (> 50% dealing range equilibrium)
                     in_premium = ifvg_mid >= eq_50
-                    # Step 3: HTF POI confluence check
                     htf_ok = _has_htf_poi_confluence(candles_by_tf, ifvg_low, ifvg_high, atr, direction="SHORT")
 
-                    # Invalidation: decisive close above Bearish iFVG upper boundary or swing high break
                     inv_swing_high = max(c["high"] for c in lookback[max(0, i - 2) : i + 1 + disp_idx + 1])
                     decisive_break_ifvg = any(c["close"] > ifvg_high for c in post_fvg[disp_idx:]) or (curr["close"] > ifvg_high)
                     broke_inv_high = any(c["high"] > inv_swing_high for c in after_disp[-3:]) or (live_price > inv_swing_high)
                     invalidated = decisive_break_ifvg or broke_inv_high
 
-                    # CP3: Controlled volume on iFVG retest pullback + live entry break
                     cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
                     retest_touch = (prev["high"] >= ifvg_low and prev["close"] <= ifvg_high) or (
                         curr["high"] >= ifvg_low and curr["close"] <= ifvg_high
@@ -1875,6 +1882,279 @@ def evaluate_ifvg_continuation_tf(
                                     "tp1_hit": False,
                                     "status": "OPEN",
                                 })
+                        break
+
+    return setups
+
+
+# ==============================================================================
+# STRATEGY #8: MSS + BREAKER BLOCK ENTRY (DISPLACED MSS + OTE 0.618-0.786)
+# ==============================================================================
+def evaluate_mss_breaker_ote_tf(
+    symbol, market, style, tf, candles, live_price, htf_poi_bias="NEUTRAL", candles_by_tf=None, now_dt=None
+):
+    """
+    Isolated single-timeframe state evaluation for MSS + Breaker Block Entry.
+    Supports LONG (swept/violated swing low -> bullish displacement & MSS -> Bullish Breaker Block + 0.618-0.786 OTE)
+    and SHORT (swept/violated swing high -> bearish displacement & MSS -> Bearish Breaker Block + 0.618-0.786 OTE)
+    across Intraday and Swing with HTF POI confluence and 3 volume checkpoints. No killzone filter.
+    """
+    if not candles or len(candles) < 35:
+        return []
+
+    if style == "Swing" and htf_poi_bias == "NEUTRAL":
+        return []
+
+    now_str = format_ist_timestamp(now_dt)
+    setups = []
+    atr = calc_atr(candles, 14)
+    base_vol = avg_volume(candles[:-1], 20)
+    is_nse_index = market == "NSE" and symbol.upper() in NSE_INDEX_SYMBOLS
+    vol_available = base_vol > 0 and not is_nse_index
+
+    lookback = candles[-34:]
+    curr = lookback[-1]
+    prev = lookback[-2]
+
+    swing_lows = _find_swing_lows(lookback[:-4], 2, 2)
+    swing_highs = _find_swing_highs(lookback[:-4], 2, 2)
+
+    # ---------------- LONG ENTRY LOGIC (BULLISH BREAKER + DISPLACED MSS + OTE) ----------------
+    if (style == "Intraday" or htf_poi_bias == "BULLISH") and swing_lows and swing_highs:
+        for sw_idx, sw_low_val in reversed(swing_lows[:-1]):
+            if sw_idx < 2 or sw_idx >= len(lookback) - 5:
+                continue
+
+            # CP1: Controlled volume during candidate swing low formation
+            sw_window = lookback[max(0, sw_idx - 1) : min(len(lookback), sw_idx + 2)]
+            sw_vols = [x.get("volume", 0) or 0 for x in sw_window]
+            sw_avg_vol = (sum(sw_vols) / len(sw_vols)) if sw_vols else 0.0
+            cp1_ok = (not vol_available) or (sw_avg_vol <= base_vol * 1.25)
+            if not cp1_ok:
+                continue
+
+            post_sw = lookback[sw_idx + 1 :]
+            violated_rel_idx = None
+            breaker_high = sw_low_val
+            breaker_low = sw_low_val
+
+            for idx_rel, c_item in enumerate(post_sw[:-2]):
+                if c_item["low"] < sw_low_val:
+                    violated_rel_idx = idx_rel
+                    breaker_low = c_item["low"]
+                    breaker_high = max(sw_low_val, c_item["high"])
+                    break
+
+            if violated_rel_idx is None:
+                continue
+
+            after_violation = post_sw[violated_rel_idx + 1 :]
+            if len(after_violation) < 2:
+                continue
+
+            prior_highs = [h for idx, h in swing_highs if idx <= sw_idx + violated_rel_idx]
+            mss_target = prior_highs[-1] if prior_highs else max(c["high"] for c in lookback[: sw_idx + violated_rel_idx + 1])
+
+            # Step 2: Bullish displacement leg + Displaced MSS break + CP2 expanding volume
+            disp_rel_idx = None
+            cp2_ok = False
+            for j, c_disp in enumerate(after_violation[:-1]):
+                if c_disp["close"] > mss_target and (c_disp["close"] - c_disp["open"]) > atr * 0.45:
+                    disp_rel_idx = j
+                    cp2_ok = (not vol_available) or (c_disp.get("volume", 0) >= base_vol * 1.15)
+                    break
+
+            if disp_rel_idx is None or not cp2_ok:
+                continue
+
+            impulse_start_low = min(c["low"] for c in post_sw[violated_rel_idx : violated_rel_idx + 1 + disp_rel_idx + 1])
+            impulse_high = max(c["high"] for c in post_sw[violated_rel_idx : violated_rel_idx + 1 + disp_rel_idx + 1])
+            if impulse_high <= impulse_start_low:
+                continue
+
+            # Step 3: OTE (0.618 - 0.786) from bullish impulse swing low (1.0) to impulse swing high (0.0)
+            imp_range = impulse_high - impulse_start_low
+            ote_high = impulse_high - (0.618 * imp_range)
+            ote_low = impulse_high - (0.786 * imp_range)
+
+            zone_low = min(ote_low, breaker_low)
+            zone_high = max(ote_high, breaker_high)
+
+            htf_ok = _has_htf_poi_confluence(candles_by_tf, zone_low, zone_high, atr, direction="LONG")
+
+            after_disp = after_violation[disp_rel_idx + 1 :]
+            inv_low = min(breaker_low, impulse_start_low)
+            decisive_break_breaker = any(c["close"] < breaker_low for c in after_disp) or (curr["close"] < breaker_low)
+            broke_inv_low = any(c["low"] < inv_low for c in after_disp[-3:]) or (live_price < inv_low)
+            invalidated = decisive_break_breaker or broke_inv_low
+
+            # CP3: Controlled volume on OTE + Breaker pullback + live entry break
+            cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
+            in_ote_breaker = (prev["low"] <= zone_high and prev["close"] >= zone_low) or (
+                curr["low"] <= zone_high and curr["close"] >= zone_low
+            )
+            bullish_confirm = curr["close"] > curr["open"] and curr["low"] <= zone_high
+
+            if (
+                htf_ok
+                and not invalidated
+                and cp3_ok
+                and in_ote_breaker
+                and bullish_confirm
+                and live_price > curr["high"]
+            ):
+                pullback_swing_low = min(prev["low"], curr["low"], breaker_low)
+                entry = float(live_price)
+                sl = float(pullback_swing_low - (0.15 * atr))
+                risk = entry - sl
+                if risk > 0:
+                    eq_50 = impulse_start_low + (0.5 * imp_range)
+                    tp1 = float(max(eq_50, impulse_high))
+                    opposing_highs = [h for _, h in swing_highs if h > tp1]
+                    pool_tp2 = opposing_highs[0] if opposing_highs else (impulse_high + risk)
+                    tp2 = float(max(pool_tp2, entry + (2.2 * risk)))
+                    rr = (tp2 - entry) / risk
+                    if rr >= 2.0:
+                        be_price = float(entry + risk)
+                        setups.append({
+                            "trade_id": f"STRAT08_{symbol}_{market}_{style}_{tf}_LONG_{curr.get('time', '')}",
+                            "symbol": symbol,
+                            "market": market,
+                            "strategy": STRATEGY_8_CONFIG["name"],
+                            "direction": "LONG",
+                            "style": style,
+                            "timeframe": tf,
+                            "entry": round(entry, 4),
+                            "entry_time": now_str,
+                            "sl": round(sl, 4),
+                            "active_sl": round(sl, 4),
+                            "be_trigger": round(be_price, 4),
+                            "tp1": round(tp1, 4),
+                            "tp2": round(tp2, 4),
+                            "rr": round(rr, 2),
+                            "be_hit": False,
+                            "tp1_hit": False,
+                            "status": "OPEN",
+                        })
+                        break
+
+    # ---------------- SHORT SELL LOGIC (BEARISH BREAKER + DISPLACED MSS + OTE) ----------------
+    if (style == "Intraday" or htf_poi_bias == "BEARISH") and swing_highs and swing_lows:
+        for sw_idx, sw_high_val in reversed(swing_highs[:-1]):
+            if sw_idx < 2 or sw_idx >= len(lookback) - 5:
+                continue
+
+            # CP1: Controlled volume during candidate swing high formation
+            sw_window = lookback[max(0, sw_idx - 1) : min(len(lookback), sw_idx + 2)]
+            sw_vols = [x.get("volume", 0) or 0 for x in sw_window]
+            sw_avg_vol = (sum(sw_vols) / len(sw_vols)) if sw_vols else 0.0
+            cp1_ok = (not vol_available) or (sw_avg_vol <= base_vol * 1.25)
+            if not cp1_ok:
+                continue
+
+            post_sw = lookback[sw_idx + 1 :]
+            violated_rel_idx = None
+            breaker_high = sw_high_val
+            breaker_low = sw_high_val
+
+            for idx_rel, c_item in enumerate(post_sw[:-2]):
+                if c_item["high"] > sw_high_val:
+                    violated_rel_idx = idx_rel
+                    breaker_high = c_item["high"]
+                    breaker_low = min(sw_high_val, c_item["low"])
+                    break
+
+            if violated_rel_idx is None:
+                continue
+
+            after_violation = post_sw[violated_rel_idx + 1 :]
+            if len(after_violation) < 2:
+                continue
+
+            prior_lows = [l for idx, l in swing_lows if idx <= sw_idx + violated_rel_idx]
+            mss_target = prior_lows[-1] if prior_lows else min(c["low"] for c in lookback[: sw_idx + violated_rel_idx + 1])
+
+            # Step 2: Bearish displacement leg + Displaced MSS break + CP2 expanding volume
+            disp_rel_idx = None
+            cp2_ok = False
+            for j, c_disp in enumerate(after_violation[:-1]):
+                if c_disp["close"] < mss_target and (c_disp["open"] - c_disp["close"]) > atr * 0.45:
+                    disp_rel_idx = j
+                    cp2_ok = (not vol_available) or (c_disp.get("volume", 0) >= base_vol * 1.15)
+                    break
+
+            if disp_rel_idx is None or not cp2_ok:
+                continue
+
+            impulse_start_high = max(c["high"] for c in post_sw[violated_rel_idx : violated_rel_idx + 1 + disp_rel_idx + 1])
+            impulse_low = min(c["low"] for c in post_sw[violated_rel_idx : violated_rel_idx + 1 + disp_rel_idx + 1])
+            if impulse_start_high <= impulse_low:
+                continue
+
+            # Step 3: OTE (0.618 - 0.786) from bearish impulse swing high (1.0) to impulse swing low (0.0)
+            imp_range = impulse_start_high - impulse_low
+            ote_low = impulse_low + (0.618 * imp_range)
+            ote_high = impulse_low + (0.786 * imp_range)
+
+            zone_low = min(ote_low, breaker_low)
+            zone_high = max(ote_high, breaker_high)
+
+            htf_ok = _has_htf_poi_confluence(candles_by_tf, zone_low, zone_high, atr, direction="SHORT")
+
+            after_disp = after_violation[disp_rel_idx + 1 :]
+            inv_high = max(breaker_high, impulse_start_high)
+            decisive_break_breaker = any(c["close"] > breaker_high for c in after_disp) or (curr["close"] > breaker_high)
+            broke_inv_high = any(c["high"] > inv_high for c in after_disp[-3:]) or (live_price > inv_high)
+            invalidated = decisive_break_breaker or broke_inv_high
+
+            # CP3: Controlled volume on OTE + Breaker pullback + live entry break
+            cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
+            in_ote_breaker = (prev["high"] >= zone_low and prev["close"] <= zone_high) or (
+                curr["high"] >= zone_low and curr["close"] <= zone_high
+            )
+            bearish_confirm = curr["close"] < curr["open"] and curr["high"] >= zone_low
+
+            if (
+                htf_ok
+                and not invalidated
+                and cp3_ok
+                and in_ote_breaker
+                and bearish_confirm
+                and live_price < curr["low"]
+            ):
+                pullback_swing_high = max(prev["high"], curr["high"], breaker_high)
+                entry = float(live_price)
+                sl = float(pullback_swing_high + (0.15 * atr))
+                risk = sl - entry
+                if risk > 0:
+                    eq_50 = impulse_start_high - (0.5 * imp_range)
+                    tp1 = float(min(eq_50, impulse_low))
+                    opposing_lows = [l for _, l in swing_lows if l < tp1]
+                    pool_tp2 = opposing_lows[-1] if opposing_lows else (impulse_low - risk)
+                    tp2 = float(min(pool_tp2, entry - (2.2 * risk)))
+                    rr = (entry - tp2) / risk
+                    if rr >= 2.0:
+                        be_price = float(entry - risk)
+                        setups.append({
+                            "trade_id": f"STRAT08_{symbol}_{market}_{style}_{tf}_SHORT_{curr.get('time', '')}",
+                            "symbol": symbol,
+                            "market": market,
+                            "strategy": STRATEGY_8_CONFIG["name"],
+                            "direction": "SHORT",
+                            "style": style,
+                            "timeframe": tf,
+                            "entry": round(entry, 4),
+                            "entry_time": now_str,
+                            "sl": round(sl, 4),
+                            "active_sl": round(sl, 4),
+                            "be_trigger": round(be_price, 4),
+                            "tp1": round(tp1, 4),
+                            "tp2": round(tp2, 4),
+                            "rr": round(rr, 2),
+                            "be_hit": False,
+                            "tp1_hit": False,
+                            "status": "OPEN",
+                        })
                         break
 
     return setups
@@ -2128,6 +2408,26 @@ def evaluate_strategies_detailed(symbol, market, price, candles_by_tf=None):
             for tf in s7_tfs.get(style, []):
                 tf_candles = candles_by_tf.get(tf) or []
                 matches = evaluate_ifvg_continuation_tf(
+                    symbol=symbol,
+                    market=market,
+                    style=style,
+                    tf=tf,
+                    candles=tf_candles,
+                    live_price=price,
+                    htf_poi_bias=htf_poi_bias,
+                    candles_by_tf=candles_by_tf,
+                    now_dt=now_dt,
+                )
+                setups.extend(matches)
+
+    # --- Strategy #8: MSS + Breaker Block Entry (Intraday + HTF POI Swing, No Killzone) ---
+    if hours_ok:
+        s8_tfs = STRATEGY_8_CONFIG["timeframes"].get(market, {})
+        for style in ("Intraday", "Swing"):
+            htf_poi_bias = check_htf_poi_bias(candles_by_tf, price) if style == "Swing" else "NEUTRAL"
+            for tf in s8_tfs.get(style, []):
+                tf_candles = candles_by_tf.get(tf) or []
+                matches = evaluate_mss_breaker_ote_tf(
                     symbol=symbol,
                     market=market,
                     style=style,
