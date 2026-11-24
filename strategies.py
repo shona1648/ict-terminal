@@ -22,6 +22,33 @@ STRATEGY_1_CONFIG = {
     },
 }
 
+STRATEGY_2_CONFIG = {
+    "id": "STRAT_02",
+    "name": "Silver Bullet Setup",
+    "markets": ["NSE", "Crypto"],
+    "pending_markets": ["MCX"],
+    "styles": ["Intraday"],
+    "timeframes": {
+        "NSE": {
+            "Intraday": ["3m", "5m", "15m"],
+        },
+        "Crypto": {
+            "Intraday": ["15m", "30m", "1h"],
+        },
+    },
+    "delivery_windows_ist": {
+        "NSE": [
+            (dt_time(9, 30), dt_time(10, 30)),
+            (dt_time(13, 30), dt_time(14, 30)),
+        ],
+        "Crypto": [
+            (dt_time(13, 30), dt_time(14, 30)),  # London Silver Bullet
+            (dt_time(19, 30), dt_time(20, 30)),  # NY AM Silver Bullet
+            (dt_time(23, 30), dt_time(0, 30)),   # NY PM Silver Bullet
+        ],
+    },
+}
+
 NSE_INDEX_SYMBOLS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "^NSEI", "^NSEBANK", "^CNXFIN", "^BSESN"}
 
 
@@ -67,6 +94,37 @@ def check_session_and_killzone(market, style, now_dt=None):
         if london_kz or ny_kz or ny_pm_kz:
             return True, "Crypto Killzone Active"
         return False, "Outside Crypto Killzone"
+
+    return False, "Unsupported Market"
+
+
+def check_silver_bullet_window(market, now_dt=None):
+    """
+    Strategy #2: Killzone + 60-minute Interbank Delivery Window check (IST).
+    NSE mein London/NY Killzone bypass karke NSE Silver Bullet windows check hote hain.
+    """
+    if market in PENDING_MARKETS:
+        return False, f"{market} Pending"
+
+    now_dt = now_dt or get_ist_now()
+    t = now_dt.time()
+
+    if market == "NSE":
+        if now_dt.weekday() >= 5:
+            return False, "NSE Weekend Closed"
+        for start_t, end_t in STRATEGY_2_CONFIG["delivery_windows_ist"]["NSE"]:
+            if _in_window(t, start_t, end_t):
+                return True, "NSE Silver Bullet Delivery Window"
+        return False, "Outside NSE Silver Bullet Window"
+
+    if market == "Crypto":
+        allowed_kz, reason = check_session_and_killzone("Crypto", "Intraday", now_dt)
+        if not allowed_kz:
+            return False, reason
+        for start_t, end_t in STRATEGY_2_CONFIG["delivery_windows_ist"]["Crypto"]:
+            if _in_window(t, start_t, end_t):
+                return True, "Crypto Silver Bullet Delivery Window"
+        return False, "Outside Crypto Silver Bullet Window"
 
     return False, "Unsupported Market"
 
@@ -325,6 +383,182 @@ def evaluate_ict_2022_tf(symbol, market, style, tf, candles, live_price, htf_bia
 
 
 # ==============================================================================
+# STRATEGY #2: SILVER BULLET SETUP (STRICTLY INTRADAY, NO HTF BIAS)
+# ==============================================================================
+def evaluate_silver_bullet_tf(symbol, market, tf, candles, live_price, now_dt=None):
+    """
+    Isolated single-timeframe state evaluation for Silver Bullet Setup (LONG & SHORT).
+    Strictly Intraday (Swing OFF, No HTF confirmation required).
+    """
+    if not candles or len(candles) < 35:
+        return []
+
+    now_str = format_ist_timestamp(now_dt)
+    setups = []
+    atr = calc_atr(candles, 14)
+    base_vol = avg_volume(candles[:-1], 20)
+    is_nse_index = market == "NSE" and symbol.upper() in NSE_INDEX_SYMBOLS
+    vol_available = base_vol > 0 and not is_nse_index
+
+    lookback = candles[-24:]
+    curr = lookback[-1]
+    prev = lookback[-2]
+
+    swing_lows = _find_swing_lows(lookback[:-4], 2, 2)
+    swing_highs = _find_swing_highs(lookback[:-4], 2, 2)
+
+    # ---------------- LONG ENTRY LOGIC (BULLISH SILVER BULLET) ----------------
+    if swing_lows and swing_highs:
+        ssl_idx, ssl_level = swing_lows[-1]
+        post_ssl = lookback[ssl_idx + 1 :]
+
+        if len(post_ssl) >= 4:
+            sweep_candle = min(post_ssl[:-2], key=lambda c: c["low"])
+            sweep_low = sweep_candle["low"]
+            sweep_idx = post_ssl.index(sweep_candle)
+
+            if sweep_low < ssl_level:
+                cp1_ok = (not vol_available) or (sweep_candle.get("volume", 0) >= base_vol * 1.15)
+
+                after_sweep = post_ssl[sweep_idx + 1 :]
+                prior_highs = [h for idx, h in swing_highs if idx <= ssl_idx + sweep_idx]
+                mss_target = prior_highs[-1] if prior_highs else max(c["high"] for c in lookback[: ssl_idx + 1])
+
+                disp_high = max((c["high"] for c in after_sweep), default=0)
+                mss_broken = any(c["close"] > mss_target for c in after_sweep)
+
+                fvg_zone = None
+                cp2_ok = False
+                for i in range(2, len(after_sweep)):
+                    c0, c1, c2 = after_sweep[i - 2], after_sweep[i - 1], after_sweep[i]
+                    if c0["high"] < c2["low"] and (c1["close"] - c1["open"]) > atr * 0.55:
+                        fvg_zone = (c0["high"], c2["low"])
+                        if (not vol_available) or (c1.get("volume", 0) >= base_vol * 1.2):
+                            cp2_ok = True
+                        break
+
+                if cp1_ok and mss_broken and fvg_zone and cp2_ok and disp_high > sweep_low:
+                    fvg_bottom, fvg_top = fvg_zone
+
+                    invalidated = any(c["low"] < sweep_low for c in after_sweep[-3:]) or live_price < sweep_low
+
+                    in_fvg = (prev["low"] <= fvg_top and prev["close"] >= fvg_bottom) or (
+                        curr["low"] <= fvg_top and curr["close"] >= fvg_bottom
+                    )
+                    cp3_ok = (not vol_available) or (prev.get("volume", 0) <= base_vol * 1.35)
+
+                    bullish_confirm = curr["close"] > curr["open"] and curr["low"] <= fvg_top
+                    if not invalidated and in_fvg and cp3_ok and bullish_confirm and live_price > curr["high"]:
+                        entry = float(live_price)
+                        sl = float(sweep_low - (0.15 * atr))
+                        risk = entry - sl
+                        if risk > 0:
+                            tp1 = float(disp_high)
+                            next_highs = [h for _, h in swing_highs if h > disp_high]
+                            pool_tp2 = next_highs[0] if next_highs else (disp_high + risk)
+                            tp2 = float(max(pool_tp2, entry + (2.0 * risk)))
+                            rr = (tp2 - entry) / risk
+                            if rr >= 2.0:
+                                be_price = float(entry + risk)
+                                setups.append({
+                                    "trade_id": f"STRAT02_{symbol}_{market}_Intraday_{tf}_LONG_{curr.get('time', '')}",
+                                    "symbol": symbol,
+                                    "market": market,
+                                    "strategy": STRATEGY_2_CONFIG["name"],
+                                    "direction": "LONG",
+                                    "style": "Intraday",
+                                    "timeframe": tf,
+                                    "entry": round(entry, 4),
+                                    "entry_time": now_str,
+                                    "sl": round(sl, 4),
+                                    "active_sl": round(sl, 4),
+                                    "be_trigger": round(be_price, 4),
+                                    "tp1": round(tp1, 4),
+                                    "tp2": round(tp2, 4),
+                                    "rr": round(rr, 2),
+                                    "be_hit": False,
+                                    "tp1_hit": False,
+                                    "status": "OPEN",
+                                })
+
+    # ---------------- SHORT SELL LOGIC (BEARISH SILVER BULLET) ----------------
+    if swing_highs and swing_lows:
+        bsl_idx, bsl_level = swing_highs[-1]
+        post_bsl = lookback[bsl_idx + 1 :]
+
+        if len(post_bsl) >= 4:
+            sweep_candle = max(post_bsl[:-2], key=lambda c: c["high"])
+            sweep_high = sweep_candle["high"]
+            sweep_idx = post_bsl.index(sweep_candle)
+
+            if sweep_high > bsl_level:
+                cp1_ok = (not vol_available) or (sweep_candle.get("volume", 0) >= base_vol * 1.15)
+
+                after_sweep = post_bsl[sweep_idx + 1 :]
+                prior_lows = [l for idx, l in swing_lows if idx <= bsl_idx + sweep_idx]
+                mss_target = prior_lows[-1] if prior_lows else min(c["low"] for c in lookback[: bsl_idx + 1])
+
+                disp_low = min((c["low"] for c in after_sweep), default=0)
+                mss_broken = any(c["close"] < mss_target for c in after_sweep)
+
+                fvg_zone = None
+                cp2_ok = False
+                for i in range(2, len(after_sweep)):
+                    c0, c1, c2 = after_sweep[i - 2], after_sweep[i - 1], after_sweep[i]
+                    if c0["low"] > c2["high"] and (c1["open"] - c1["close"]) > atr * 0.55:
+                        fvg_zone = (c2["high"], c0["low"])
+                        if (not vol_available) or (c1.get("volume", 0) >= base_vol * 1.2):
+                            cp2_ok = True
+                        break
+
+                if cp1_ok and mss_broken and fvg_zone and cp2_ok and sweep_high > disp_low:
+                    fvg_bottom, fvg_top = fvg_zone
+
+                    invalidated = any(c["high"] > sweep_high for c in after_sweep[-3:]) or live_price > sweep_high
+
+                    in_fvg = (prev["high"] >= fvg_bottom and prev["close"] <= fvg_top) or (
+                        curr["high"] >= fvg_bottom and curr["close"] <= fvg_top
+                    )
+                    cp3_ok = (not vol_available) or (prev.get("volume", 0) <= base_vol * 1.35)
+
+                    bearish_confirm = curr["close"] < curr["open"] and curr["high"] >= fvg_bottom
+                    if not invalidated and in_fvg and cp3_ok and bearish_confirm and live_price < curr["low"]:
+                        entry = float(live_price)
+                        sl = float(sweep_high + (0.15 * atr))
+                        risk = sl - entry
+                        if risk > 0:
+                            tp1 = float(disp_low)
+                            next_lows = [l for _, l in swing_lows if l < disp_low]
+                            pool_tp2 = next_lows[-1] if next_lows else (disp_low - risk)
+                            tp2 = float(min(pool_tp2, entry - (2.0 * risk)))
+                            rr = (entry - tp2) / risk
+                            if rr >= 2.0:
+                                be_price = float(entry - risk)
+                                setups.append({
+                                    "trade_id": f"STRAT02_{symbol}_{market}_Intraday_{tf}_SHORT_{curr.get('time', '')}",
+                                    "symbol": symbol,
+                                    "market": market,
+                                    "strategy": STRATEGY_2_CONFIG["name"],
+                                    "direction": "SHORT",
+                                    "style": "Intraday",
+                                    "timeframe": tf,
+                                    "entry": round(entry, 4),
+                                    "entry_time": now_str,
+                                    "sl": round(sl, 4),
+                                    "active_sl": round(sl, 4),
+                                    "be_trigger": round(be_price, 4),
+                                    "tp1": round(tp1, 4),
+                                    "tp2": round(tp2, 4),
+                                    "rr": round(rr, 2),
+                                    "be_hit": False,
+                                    "tp1_hit": False,
+                                    "status": "OPEN",
+                                })
+
+    return setups
+
+
+# ==============================================================================
 # LIVE TRADE MANAGEMENT (BE@1:1, TP1, TP2, SL WITH IST TIMESTAMPS)
 # ==============================================================================
 def process_live_trade_updates(active_trades, current_prices, now_dt=None):
@@ -434,11 +668,12 @@ def process_live_trade_updates(active_trades, current_prices, now_dt=None):
 
 
 # ==============================================================================
-# MASTER STRATEGY EVALUATOR
+# MASTER STRATEGY EVALUATOR (ALL ACTIVE STRATEGIES)
 # ==============================================================================
 def evaluate_strategies_detailed(symbol, market, price, candles_by_tf=None):
     """
-    Structured setup dicts aur formatted Telegram alert strings dono return karta hai.
+    Sabhi active strategies ko parallel/independent evaluate karta hai.
+    Returns: (structured_setups_list, formatted_alert_strings_list)
     """
     if not candles_by_tf or market in PENDING_MARKETS:
         return [], []
@@ -447,6 +682,7 @@ def evaluate_strategies_detailed(symbol, market, price, candles_by_tf=None):
     formatted_alerts = []
     now_dt = get_ist_now()
 
+    # --- Strategy #1: ICT 2022 Model (Intraday + Swing) ---
     s1_tfs = STRATEGY_1_CONFIG["timeframes"].get(market, {})
     for style in ("Intraday", "Swing"):
         allowed, _ = check_session_and_killzone(market, style, now_dt)
@@ -466,15 +702,32 @@ def evaluate_strategies_detailed(symbol, market, price, candles_by_tf=None):
                 htf_bias=htf_bias,
                 now_dt=now_dt,
             )
-            for m in matches:
-                setups.append(m)
-                label = (
-                    f"{m['strategy']} | {m['direction']} ({m['style']} - {m['timeframe']}) | "
-                    f"Opportunity Time: {m['entry_time']} | Entry: {m['entry']} | "
-                    f"SL: {m['sl']} (BE@1:1: {m['be_trigger']}) | "
-                    f"TP1: {m['tp1']} | TP2: {m['tp2']} | R:R 1:{m['rr']}"
-                )
-                formatted_alerts.append(label)
+            setups.extend(matches)
+
+    # --- Strategy #2: Silver Bullet Setup (Strictly Intraday) ---
+    sb_allowed, _ = check_silver_bullet_window(market, now_dt)
+    if sb_allowed:
+        s2_tfs = STRATEGY_2_CONFIG["timeframes"].get(market, {}).get("Intraday", [])
+        for tf in s2_tfs:
+            tf_candles = candles_by_tf.get(tf) or []
+            matches = evaluate_silver_bullet_tf(
+                symbol=symbol,
+                market=market,
+                tf=tf,
+                candles=tf_candles,
+                live_price=price,
+                now_dt=now_dt,
+            )
+            setups.extend(matches)
+
+    for m in setups:
+        label = (
+            f"{m['strategy']} | {m['direction']} ({m['style']} - {m['timeframe']}) | "
+            f"Opportunity Time: {m['entry_time']} | Entry: {m['entry']} | "
+            f"SL: {m['sl']} (BE@1:1: {m['be_trigger']}) | "
+            f"TP1: {m['tp1']} | TP2: {m['tp2']} | R:R 1:{m['rr']}"
+        )
+        formatted_alerts.append(label)
 
     return setups, formatted_alerts
 
