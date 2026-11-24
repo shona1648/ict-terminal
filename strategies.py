@@ -175,6 +175,27 @@ STRATEGY_8_CONFIG = {
     },
 }
 
+STRATEGY_9_CONFIG = {
+    "id": "STRAT_09",
+    "name": "Premium / Discount Array Matrix",
+    "markets": ["NSE", "Crypto"],
+    "pending_markets": ["MCX"],
+    "styles": ["Intraday", "Swing"],
+    "use_killzone": False,
+    "timeframes": {
+        "NSE": {
+            "Intraday": ["3m", "5m", "15m"],
+            "Swing": ["1h", "4h", "1d"],
+            "HTF_POI": ["4h", "1d", "1w"],
+        },
+        "Crypto": {
+            "Intraday": ["15m", "30m", "1h"],
+            "Swing": ["1h", "4h", "1d"],
+            "HTF_POI": ["4h", "1d", "1w"],
+        },
+    },
+}
+
 NSE_INDEX_SYMBOLS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "^NSEI", "^NSEBANK", "^CNXFIN", "^BSESN"}
 
 
@@ -359,8 +380,8 @@ def check_htf_poi_bias(candles_by_tf, live_price):
 
 def _has_institutional_reference_confluence(symbol, market, zone_low, zone_high, atr):
     """
-    Strategy #5: Checks whether the OB / retest zone aligns with or sits near
-    a relevant Institutional Reference Number (psychological / round figure level).
+    Strategy #5 & #9: Checks whether the array / retest zone aligns with or sits near
+    a relevant Institutional Reference Number (00 / 20 / 50 / 80 endings or round levels).
     """
     mid_price = (zone_low + zone_high) / 2.0
     if mid_price <= 0:
@@ -378,20 +399,26 @@ def _has_institutional_reference_confluence(symbol, market, zone_low, zone_high,
     else:
         step = 1.0
 
-    nearest_lower = (mid_price // step) * step
-    nearest_upper = nearest_lower + step
-    tolerance = max(atr * 0.65, step * 0.12)
+    # Check both major step levels and 00/20/50/80 sub-increments
+    candidates = []
+    base_lower = (mid_price // step) * step
+    for m in (-1, 0, 1, 2):
+        candidates.append(base_lower + (m * step))
+        for sub_pct in (0.20, 0.50, 0.80):
+            candidates.append(base_lower + ((m + sub_pct) * step))
 
-    if zone_low <= nearest_lower <= zone_high or zone_low <= nearest_upper <= zone_high:
-        return True
-    if abs(mid_price - nearest_lower) <= tolerance or abs(mid_price - nearest_upper) <= tolerance:
-        return True
+    tolerance = max(atr * 0.75, step * 0.08)
+    for lvl in candidates:
+        if lvl <= 0:
+            continue
+        if zone_low <= lvl <= zone_high or abs(mid_price - lvl) <= tolerance:
+            return True
     return False
 
 
 def _has_htf_poi_confluence(candles_by_tf, zone_low, zone_high, atr, direction="LONG"):
     """
-    Strategy #7 & #8: Isolated HTF POI confluence check using 4H / 1D / 1W structure/POI levels
+    Strategy #7, #8 & #9: Isolated HTF POI confluence check using 4H / 1D / 1W structure/POI levels
     without relying on cross-timeframe running state.
     """
     if not candles_by_tf:
@@ -1925,7 +1952,6 @@ def evaluate_mss_breaker_ote_tf(
             if sw_idx < 2 or sw_idx >= len(lookback) - 5:
                 continue
 
-            # CP1: Controlled volume during candidate swing low formation
             sw_window = lookback[max(0, sw_idx - 1) : min(len(lookback), sw_idx + 2)]
             sw_vols = [x.get("volume", 0) or 0 for x in sw_window]
             sw_avg_vol = (sum(sw_vols) / len(sw_vols)) if sw_vols else 0.0
@@ -1955,7 +1981,6 @@ def evaluate_mss_breaker_ote_tf(
             prior_highs = [h for idx, h in swing_highs if idx <= sw_idx + violated_rel_idx]
             mss_target = prior_highs[-1] if prior_highs else max(c["high"] for c in lookback[: sw_idx + violated_rel_idx + 1])
 
-            # Step 2: Bullish displacement leg + Displaced MSS break + CP2 expanding volume
             disp_rel_idx = None
             cp2_ok = False
             for j, c_disp in enumerate(after_violation[:-1]):
@@ -1972,7 +1997,6 @@ def evaluate_mss_breaker_ote_tf(
             if impulse_high <= impulse_start_low:
                 continue
 
-            # Step 3: OTE (0.618 - 0.786) from bullish impulse swing low (1.0) to impulse swing high (0.0)
             imp_range = impulse_high - impulse_start_low
             ote_high = impulse_high - (0.618 * imp_range)
             ote_low = impulse_high - (0.786 * imp_range)
@@ -1988,7 +2012,6 @@ def evaluate_mss_breaker_ote_tf(
             broke_inv_low = any(c["low"] < inv_low for c in after_disp[-3:]) or (live_price < inv_low)
             invalidated = decisive_break_breaker or broke_inv_low
 
-            # CP3: Controlled volume on OTE + Breaker pullback + live entry break
             cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
             in_ote_breaker = (prev["low"] <= zone_high and prev["close"] >= zone_low) or (
                 curr["low"] <= zone_high and curr["close"] >= zone_low
@@ -2044,7 +2067,6 @@ def evaluate_mss_breaker_ote_tf(
             if sw_idx < 2 or sw_idx >= len(lookback) - 5:
                 continue
 
-            # CP1: Controlled volume during candidate swing high formation
             sw_window = lookback[max(0, sw_idx - 1) : min(len(lookback), sw_idx + 2)]
             sw_vols = [x.get("volume", 0) or 0 for x in sw_window]
             sw_avg_vol = (sum(sw_vols) / len(sw_vols)) if sw_vols else 0.0
@@ -2074,7 +2096,6 @@ def evaluate_mss_breaker_ote_tf(
             prior_lows = [l for idx, l in swing_lows if idx <= sw_idx + violated_rel_idx]
             mss_target = prior_lows[-1] if prior_lows else min(c["low"] for c in lookback[: sw_idx + violated_rel_idx + 1])
 
-            # Step 2: Bearish displacement leg + Displaced MSS break + CP2 expanding volume
             disp_rel_idx = None
             cp2_ok = False
             for j, c_disp in enumerate(after_violation[:-1]):
@@ -2091,7 +2112,6 @@ def evaluate_mss_breaker_ote_tf(
             if impulse_start_high <= impulse_low:
                 continue
 
-            # Step 3: OTE (0.618 - 0.786) from bearish impulse swing high (1.0) to impulse swing low (0.0)
             imp_range = impulse_start_high - impulse_low
             ote_low = impulse_low + (0.618 * imp_range)
             ote_high = impulse_low + (0.786 * imp_range)
@@ -2107,7 +2127,6 @@ def evaluate_mss_breaker_ote_tf(
             broke_inv_high = any(c["high"] > inv_high for c in after_disp[-3:]) or (live_price > inv_high)
             invalidated = decisive_break_breaker or broke_inv_high
 
-            # CP3: Controlled volume on OTE + Breaker pullback + live entry break
             cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
             in_ote_breaker = (prev["high"] >= zone_low and prev["close"] <= zone_high) or (
                 curr["high"] >= zone_low and curr["close"] <= zone_high
@@ -2140,6 +2159,243 @@ def evaluate_mss_breaker_ote_tf(
                             "symbol": symbol,
                             "market": market,
                             "strategy": STRATEGY_8_CONFIG["name"],
+                            "direction": "SHORT",
+                            "style": style,
+                            "timeframe": tf,
+                            "entry": round(entry, 4),
+                            "entry_time": now_str,
+                            "sl": round(sl, 4),
+                            "active_sl": round(sl, 4),
+                            "be_trigger": round(be_price, 4),
+                            "tp1": round(tp1, 4),
+                            "tp2": round(tp2, 4),
+                            "rr": round(rr, 2),
+                            "be_hit": False,
+                            "tp1_hit": False,
+                            "status": "OPEN",
+                        })
+                        break
+
+    return setups
+
+
+# ==============================================================================
+# STRATEGY #9: PREMIUM / DISCOUNT ARRAY MATRIX
+# ==============================================================================
+def evaluate_pd_array_matrix_tf(
+    symbol, market, style, tf, candles, live_price, htf_poi_bias="NEUTRAL", candles_by_tf=None, now_dt=None
+):
+    """
+    Isolated single-timeframe state evaluation for Premium / Discount Array Matrix.
+    Checks Dealing Range equilibrium (50%), Discount (<50%) / Premium (>50%) PD array
+    (OB / FVG / Breaker / iFVG), HTF POI confluence, Institutional Reference Number,
+    Displaced MSS, and 3 Volume Checkpoints. No killzone filter.
+    """
+    if not candles or len(candles) < 35:
+        return []
+
+    if style == "Swing" and htf_poi_bias == "NEUTRAL":
+        return []
+
+    now_str = format_ist_timestamp(now_dt)
+    setups = []
+    atr = calc_atr(candles, 14)
+    base_vol = avg_volume(candles[:-1], 20)
+    is_nse_index = market == "NSE" and symbol.upper() in NSE_INDEX_SYMBOLS
+    vol_available = base_vol > 0 and not is_nse_index
+
+    lookback = candles[-34:]
+    curr = lookback[-1]
+    prev = lookback[-2]
+
+    range_high = max(c["high"] for c in lookback[:-2])
+    range_low = min(c["low"] for c in lookback[:-2])
+    if range_high <= range_low:
+        return []
+    eq_50 = (range_high + range_low) / 2.0
+
+    swing_lows = _find_swing_lows(lookback[:-4], 2, 2)
+    swing_highs = _find_swing_highs(lookback[:-4], 2, 2)
+
+    # ---------------- LONG ENTRY LOGIC (DISCOUNT ARRAY MATRIX) ----------------
+    if style == "Intraday" or htf_poi_bias == "BULLISH":
+        for i in range(2, len(lookback) - 3):
+            c0, c1, c2 = lookback[i - 2], lookback[i - 1], lookback[i]
+
+            arr_low = None
+            arr_high = None
+            if c0["high"] < c2["low"]:
+                arr_low, arr_high = c0["high"], c2["low"]
+            elif c1["close"] < c1["open"]:
+                arr_low, arr_high = c1["low"], c1["high"]
+            elif c2["high"] < c0["low"]:
+                arr_low, arr_high = c2["high"], c0["low"]
+
+            if arr_low is None or arr_high is None or arr_high <= arr_low:
+                continue
+
+            arr_mid = (arr_low + arr_high) / 2.0
+            # Step 1: Array must sit in Discount zone (< 50% equilibrium)
+            if arr_mid > eq_50:
+                continue
+
+            # Step 2: HTF POI + Institutional Reference Number confluence
+            htf_ok = _has_htf_poi_confluence(candles_by_tf, arr_low, arr_high, atr, direction="LONG")
+            inst_ref_ok = _has_institutional_reference_confluence(symbol, market, arr_low, arr_high, atr)
+            if not (htf_ok and inst_ref_ok):
+                continue
+
+            # CP1: Controlled / non-climactic volume during array tap/formation
+            arr_vols = [x.get("volume", 0) or 0 for x in (c0, c1, c2)]
+            arr_avg_vol = (sum(arr_vols) / len(arr_vols)) if arr_vols else 0.0
+            cp1_ok = (not vol_available) or (arr_avg_vol <= base_vol * 1.25)
+            if not cp1_ok:
+                continue
+
+            post_arr = lookback[i + 1 :]
+            prior_highs = [h for idx, h in swing_highs if idx <= i]
+            mss_target = prior_highs[-1] if prior_highs else max(c["high"] for c in lookback[: i + 1])
+
+            # Step 3: Bullish Displaced MSS leg + CP2 expanding volume
+            disp_rel_idx = None
+            cp2_ok = False
+            for j, c_disp in enumerate(post_arr[:-1]):
+                if c_disp["close"] > mss_target and (c_disp["close"] - c_disp["open"]) > atr * 0.45:
+                    disp_rel_idx = j
+                    cp2_ok = (not vol_available) or (c_disp.get("volume", 0) >= base_vol * 1.15)
+                    break
+
+            if disp_rel_idx is None or not cp2_ok:
+                continue
+
+            after_disp = post_arr[disp_rel_idx + 1 :]
+            inv_low = min(c["low"] for c in lookback[max(0, i - 2) : i + 1 + disp_rel_idx + 1])
+            decisive_break_arr = any(c["close"] < arr_low for c in after_disp) or (curr["close"] < arr_low)
+            broke_inv_low = any(c["low"] < inv_low for c in after_disp[-3:]) or (live_price < inv_low)
+            invalidated = decisive_break_arr or broke_inv_low
+
+            # CP3: Controlled volume on array retest / pullback + live entry break
+            cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
+            retest_touch = (prev["low"] <= arr_high and prev["close"] >= arr_low) or (
+                curr["low"] <= arr_high and curr["close"] >= arr_low
+            )
+            bullish_confirm = curr["close"] > curr["open"] and curr["low"] <= arr_high
+
+            if not invalidated and cp3_ok and retest_touch and bullish_confirm and live_price > curr["high"]:
+                array_swing_low = min(prev["low"], curr["low"], arr_low)
+                entry = float(live_price)
+                sl = float(array_swing_low - (0.15 * atr))
+                risk = entry - sl
+                if risk > 0:
+                    disp_high = max(c["high"] for c in post_arr)
+                    tp1 = float(max(eq_50, disp_high))
+                    tp2 = float(max(range_high, entry + (2.2 * risk)))
+                    rr = (tp2 - entry) / risk
+                    if rr >= 2.0:
+                        be_price = float(entry + risk)
+                        setups.append({
+                            "trade_id": f"STRAT09_{symbol}_{market}_{style}_{tf}_LONG_{curr.get('time', '')}",
+                            "symbol": symbol,
+                            "market": market,
+                            "strategy": STRATEGY_9_CONFIG["name"],
+                            "direction": "LONG",
+                            "style": style,
+                            "timeframe": tf,
+                            "entry": round(entry, 4),
+                            "entry_time": now_str,
+                            "sl": round(sl, 4),
+                            "active_sl": round(sl, 4),
+                            "be_trigger": round(be_price, 4),
+                            "tp1": round(tp1, 4),
+                            "tp2": round(tp2, 4),
+                            "rr": round(rr, 2),
+                            "be_hit": False,
+                            "tp1_hit": False,
+                            "status": "OPEN",
+                        })
+                        break
+
+    # ---------------- SHORT SELL LOGIC (PREMIUM ARRAY MATRIX) ----------------
+    if style == "Intraday" or htf_poi_bias == "BEARISH":
+        for i in range(2, len(lookback) - 3):
+            c0, c1, c2 = lookback[i - 2], lookback[i - 1], lookback[i]
+
+            arr_low = None
+            arr_high = None
+            if c0["low"] > c2["high"]:
+                arr_low, arr_high = c2["high"], c0["low"]
+            elif c1["close"] > c1["open"]:
+                arr_low, arr_high = c1["low"], c1["high"]
+            elif c0["high"] < c2["low"]:
+                arr_low, arr_high = c0["high"], c2["low"]
+
+            if arr_low is None or arr_high is None or arr_high <= arr_low:
+                continue
+
+            arr_mid = (arr_low + arr_high) / 2.0
+            # Step 1: Array must sit in Premium zone (> 50% equilibrium)
+            if arr_mid < eq_50:
+                continue
+
+            # Step 2: HTF POI + Institutional Reference Number confluence
+            htf_ok = _has_htf_poi_confluence(candles_by_tf, arr_low, arr_high, atr, direction="SHORT")
+            inst_ref_ok = _has_institutional_reference_confluence(symbol, market, arr_low, arr_high, atr)
+            if not (htf_ok and inst_ref_ok):
+                continue
+
+            # CP1: Controlled / non-climactic volume during array tap/formation
+            arr_vols = [x.get("volume", 0) or 0 for x in (c0, c1, c2)]
+            arr_avg_vol = (sum(arr_vols) / len(arr_vols)) if arr_vols else 0.0
+            cp1_ok = (not vol_available) or (arr_avg_vol <= base_vol * 1.25)
+            if not cp1_ok:
+                continue
+
+            post_arr = lookback[i + 1 :]
+            prior_lows = [l for idx, l in swing_lows if idx <= i]
+            mss_target = prior_lows[-1] if prior_lows else min(c["low"] for c in lookback[: i + 1])
+
+            # Step 3: Bearish Displaced MSS leg + CP2 expanding volume
+            disp_rel_idx = None
+            cp2_ok = False
+            for j, c_disp in enumerate(post_arr[:-1]):
+                if c_disp["close"] < mss_target and (c_disp["open"] - c_disp["close"]) > atr * 0.45:
+                    disp_rel_idx = j
+                    cp2_ok = (not vol_available) or (c_disp.get("volume", 0) >= base_vol * 1.15)
+                    break
+
+            if disp_rel_idx is None or not cp2_ok:
+                continue
+
+            after_disp = post_arr[disp_rel_idx + 1 :]
+            inv_high = max(c["high"] for c in lookback[max(0, i - 2) : i + 1 + disp_rel_idx + 1])
+            decisive_break_arr = any(c["close"] > arr_high for c in after_disp) or (curr["close"] > arr_high)
+            broke_inv_high = any(c["high"] > inv_high for c in after_disp[-3:]) or (live_price > inv_high)
+            invalidated = decisive_break_arr or broke_inv_high
+
+            # CP3: Controlled volume on array retest / pullback + live entry break
+            cp3_ok = (not vol_available) or (curr.get("volume", 0) <= base_vol * 1.35)
+            retest_touch = (prev["high"] >= arr_low and prev["close"] <= arr_high) or (
+                curr["high"] >= arr_low and curr["close"] <= arr_high
+            )
+            bearish_confirm = curr["close"] < curr["open"] and curr["high"] >= arr_low
+
+            if not invalidated and cp3_ok and retest_touch and bearish_confirm and live_price < curr["low"]:
+                array_swing_high = max(prev["high"], curr["high"], arr_high)
+                entry = float(live_price)
+                sl = float(array_swing_high + (0.15 * atr))
+                risk = sl - entry
+                if risk > 0:
+                    disp_low = min(c["low"] for c in post_arr)
+                    tp1 = float(min(eq_50, disp_low))
+                    tp2 = float(min(range_low, entry - (2.2 * risk)))
+                    rr = (entry - tp2) / risk
+                    if rr >= 2.0:
+                        be_price = float(entry - risk)
+                        setups.append({
+                            "trade_id": f"STRAT09_{symbol}_{market}_{style}_{tf}_SHORT_{curr.get('time', '')}",
+                            "symbol": symbol,
+                            "market": market,
+                            "strategy": STRATEGY_9_CONFIG["name"],
                             "direction": "SHORT",
                             "style": style,
                             "timeframe": tf,
@@ -2428,6 +2684,26 @@ def evaluate_strategies_detailed(symbol, market, price, candles_by_tf=None):
             for tf in s8_tfs.get(style, []):
                 tf_candles = candles_by_tf.get(tf) or []
                 matches = evaluate_mss_breaker_ote_tf(
+                    symbol=symbol,
+                    market=market,
+                    style=style,
+                    tf=tf,
+                    candles=tf_candles,
+                    live_price=price,
+                    htf_poi_bias=htf_poi_bias,
+                    candles_by_tf=candles_by_tf,
+                    now_dt=now_dt,
+                )
+                setups.extend(matches)
+
+    # --- Strategy #9: Premium / Discount Array Matrix (Intraday + HTF POI Swing, No Killzone) ---
+    if hours_ok:
+        s9_tfs = STRATEGY_9_CONFIG["timeframes"].get(market, {})
+        for style in ("Intraday", "Swing"):
+            htf_poi_bias = check_htf_poi_bias(candles_by_tf, price) if style == "Swing" else "NEUTRAL"
+            for tf in s9_tfs.get(style, []):
+                tf_candles = candles_by_tf.get(tf) or []
+                matches = evaluate_pd_array_matrix_tf(
                     symbol=symbol,
                     market=market,
                     style=style,
