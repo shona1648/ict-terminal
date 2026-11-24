@@ -293,20 +293,10 @@ with tab1:
     elif "MCX" in scan_target_category:
         active_pool = [(s, "MCX Commodities") for s in st.session_state.mcx_watchlist]
 
-    pool_preview = ", ".join([sym for sym, _ in active_pool]) if active_pool else "None"
-    st.info(f"📋 **Target Scan Category:** `{scan_target_category}` | **Watchlist Pool ({len(active_pool)}):** `{pool_preview}`")
-
-    if active_pool:
-        lead_sym, lead_cat = active_pool[0]
-        lead_price, lead_ticker = get_live_price(lead_sym, lead_cat)
-        lead_feed = get_feed_provider(lead_cat)
-        if lead_price is not None:
-            st.caption(f"📡 **Lead Watchlist Feed ({lead_sym} • {lead_ticker} • {lead_feed}):** {format_price(lead_price, lead_cat)}")
-        else:
-            st.caption(f"📡 **Lead Watchlist Feed ({lead_sym} • {lead_feed}):** {lead_ticker}")
+    st.info(f"📋 **Active Scan Category:** `{scan_target_category}`")
 
     if st.button("Run Live Price Feed Analysis", key="btn_run_institutional_scan"):
-        with st.spinner(f"Scanning {len(active_pool)} watchlist instrument(s) across {scan_target_category}..."):
+        with st.spinner(f"Scanning {scan_target_category}..."):
             rows_html = ""
             for sym, cat in active_pool:
                 px, r_ticker = get_live_price(sym, cat)
@@ -319,9 +309,8 @@ with tab1:
 
             st.markdown(f"""
             <div class="alert-box">
-            <h3>📡 Watchlist Scan Telemetry ({scan_target_category})</h3>
+            <h3>📡 Live Feed Telemetry ({scan_target_category})</h3>
             <p><b>Scan Mode:</b> {scan_mode}</p>
-            <p><b>Total Instruments in Pool:</b> {len(active_pool)}</p>
             <hr style="border-color: #2a2e39;">
             {rows_html}
             </div>
