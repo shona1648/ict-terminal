@@ -53,6 +53,19 @@ COMMODITY_YAHOO_TICKERS = {
 }
 
 
+def get_currency_symbol(market_type):
+    if "NSE" in market_type:
+        return "₹"
+    return "$"
+
+
+def format_price(price, market_type):
+    if price is None:
+        return "Feed unavailable for this market"
+    curr = get_currency_symbol(market_type)
+    return f"{curr}{price:,.2f}"
+
+
 def get_feed_provider(market_type):
     if "Crypto" in market_type or "NSE" in market_type:
         return "Yahoo Finance"
@@ -325,13 +338,13 @@ with tab1:
     current_live_price, resolved_ticker = get_live_price(asset_input, current_cat_label)
 
     if current_live_price is not None:
-        st.caption(f"📡 **Live Market Feed ({resolved_ticker} • {feed_source}):** ₹ / $ {current_live_price:,.2f}")
+        st.caption(f"📡 **Live Market Feed ({resolved_ticker} • {feed_source}):** {format_price(current_live_price, current_cat_label)}")
     else:
         st.caption(f"📡 **Live Market Feed ({asset_input} • {feed_source}):** {resolved_ticker}")
 
     if st.button("Run Live Price Feed Analysis", key="btn_run_institutional_scan"):
         with st.spinner(f"Fetching live data & processing structure for {asset_input}..."):
-            price_text = f"₹ / $ {current_live_price:,.2f}" if current_live_price is not None else "Feed unavailable for this market"
+            price_text = format_price(current_live_price, current_cat_label)
             status_text = (
                 f"Live feed connected via Yahoo Finance ({resolved_ticker}). Note: Commodities show global front-month futures (USD), not Indian MCX INR contracts."
                 if (current_live_price is not None and "MCX" in current_cat_label)
