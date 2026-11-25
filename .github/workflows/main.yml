@@ -1,0 +1,25 @@
+name: ICT Auto Scanner Test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+jobs:
+  run-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run scanner test cycle
+        timeout-minutes: 2
+        run: python -c "import auto_scanner; auto_scanner.run_cycle()"
